@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: умножение и деление</title>
+<style>
+  :root {
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --ink: #1e293b;
+    --accent: #4f46e5;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+    background: linear-gradient(160deg, #eef2ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  /* ---------- экраны ---------- */
+  .screen { display: none; width: 100%; max-width: 760px; }
+  .screen.active { display: block; animation: fadeIn .35s ease both; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- стартовый экран ---------- */
+  .start-card {
+    background: #fff;
+    border-radius: 26px;
+    padding: 40px 30px;
+    text-align: center;
+    box-shadow: 0 22px 50px -24px rgba(30,41,59,.45);
+  }
+  h1 { font-size: clamp(26px, 6vw, 38px); margin: 0 0 10px; }
+  .subtitle { color: #64748b; font-size: 17px; margin: 0 0 26px; }
+
+  .rules { list-style: none; padding: 0; margin: 0 0 30px; display: grid; gap: 12px; }
+  .rules li {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-weight: 600;
+    font-size: 16px;
+    text-align: left;
+  }
+  .rules li b { color: var(--accent); }
+
+  /* ---------- кнопки ---------- */
+  .btn {
+    border: none;
+    border-radius: 14px;
+    padding: 13px 26px;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    background: #e2e8f0;
+    color: var(--ink);
+    transition: transform .12s ease, background .2s, box-shadow .2s, opacity .2s;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 12px 26px -12px var(--accent);
+  }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  /* ---------- верхняя панель ---------- */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: #475569;
+    gap: 10px;
+  }
+  .phase {
+    background: #fff;
+    padding: 7px 16px;
+    border-radius: 999px;
+    color: var(--accent);
+    box-shadow: 0 8px 20px -12px rgba(30,41,59,.5);
+  }
+  .progressbar {
+    height: 10px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 14px 0 26px;
+  }
+  .progressbar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #6366f1, #22c55e);
+    transition: width .45s cubic-bezier(.22,1,.36,1);
+  }
+
+  /* ---------- карточка с примером ---------- */
+  .card {
+    background: #fff;
+    border-radius: 26px;
+    padding: 34px 24px 30px;
+    text-align: center;
+    border: 3px solid transparent;
+    box-shadow: 0 22px 50px -24px rgba(30,41,59,.45);
+    transition: border-color .25s, background .25s, box-shadow .25s;
+  }
+  .card.correct {
+    border-color: var(--green);
+    background: linear-gradient(180deg, #ffffff 40%, var(--green-light));
+    box-shadow: 0 0 0 6px rgba(34,197,94,.15), 0 22px 50px -24px rgba(30,41,59,.45);
+    animation: correctPop .5s ease;
+  }
+  .card.wrong {
+    border-color: var(--red);
+    background: linear-gradient(180deg, #ffffff 40%, var(--red-light));
+    box-shadow: 0 0 0 6px rgba(239,68,68,.15), 0 22px 50px -24px rgba(30,41,59,.45);
+    animation: shake .5s ease;
+  }
+
+  @keyframes correctPop {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.035); }
+    100% { transform: scale(1); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-13px); }
+    32% { transform: translateX(11px); }
+    50% { transform: translateX(-8px); }
+    68% { transform: translateX(6px); }
+    85% { transform: translateX(-3px); }
+  }
+
+  .example {
+    font-size: clamp(44px, 12vw, 78px);
+    font-weight: 800;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+    margin: 4px 0 28px;
+    line-height: 1.1;
+    user-select: none;
+  }
+
+  .answer-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  #answer-input {
+    width: 165px;
+    font-family: inherit;
+    font-size: 32px;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 2px solid #cbd5e1;
+    outline: none;
+    color: var(--ink);
+    transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+  #answer-input:focus { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,.18); }
+  #answer-input:disabled { background: #f1f5f9; color: #94a3b8; }
+
+  .feedback {
+    min-height: 34px;
+    margin-top: 20px;
+    font-size: 21px;
+    font-weight: 700;
+  }
+  .feedback.ok  { color: var(--green); }
+  .feedback.bad { color: var(--red); }
+
+  #btn-got-it {
+    margin-top: 14px;
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 12px 26px -12px var(--accent);
+  }
+
+  /* ---------- всплывающие значки ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+  }
+  .overlay.show { animation: overlayPop .9s ease; }
+  .overlay-icon {
+    font-size: clamp(120px, 30vw, 200px);
+    font-weight: 900;
+    line-height: 1;
+  }
+  .overlay-icon.ok  { color: var(--green); text-shadow: 0 16px 50px rgba(22,163,74,.55); }
+  .overlay-icon.bad { color: var(--red);   text-shadow: 0 16px 50px rgba(220,38,38,.55); }
+
+  @keyframes overlayPop {
+    0%   { opacity: 0; transform: scale(.4); }
+    22%  { opacity: 1; transform: scale(1.12); }
+    55%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.25); }
+  }
+
+  /* ---------- баннер между этапами ---------- */
+  .banner {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(.9);
+    background: var(--accent);
+    color: #fff;
+    padding: 22px 30px;
+    border-radius: 20px;
+    font-size: clamp(17px, 4vw, 23px);
+    font-weight: 800;
+    text-align: center;
+    max-width: 90vw;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease, transform .3s ease;
+    z-index: 60;
+    box-shadow: 0 24px 60px -22px rgba(79,70,229,.95);
+  }
+  .banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  /* ---------- экран результатов ---------- */
+  .result-card {
+    background: #fff;
+    border-radius: 26px;
+    padding: 34px 26px 30px;
+    box-shadow: 0 22px 50px -24px rgba(30,41,59,.45);
+  }
+  .results {
+    margin: 22px 0 28px;
+    max-height: 52vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .results h2 {
+    font-size: 13px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin: 18px 0 10px;
+  }
+  .results h2:first-child { margin-top: 0; }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+  }
+  .result-item {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    border: 2px solid #e2e8f0;
+    background: #f8fafc;
+    color: #0f172a;
+  }
+  .result-item.ok {
+    color: var(--green);
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+  }
+  .result-item.bad {
+    color: #000000;
+    border-color: #cbd5e1;
+    background: #f1f5f9;
+  }
+  .result-item .note {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-top: 3px;
+  }
+  .center { text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- ============ ЭКРАН 1: СТАРТ ============ -->
+<section id="screen-start" class="screen active">
+  <div class="start-card">
+    <h1>Тренажёр счёта</h1>
+    <p class="subtitle">Умножение и деление целых чисел</p>
+    <ul class="rules">
+      <li>✖️ <b>12</b> верно решённых примеров на умножение</li>
+      <li>➗ <b>12</b> верно решённых примеров на деление</li>
+      <li>🎯 Ошибочный пример вернётся к тебе позже</li>
+    </ul>
+    <button class="btn primary" id="btn-start">Начать</button>
+  </div>
+</section>
+
+<!-- ============ ЭКРАН 2: ЗАДАНИЕ ============ -->
+<section id="screen-task" class="screen">
+  <div class="topbar">
+    <div class="phase" id="phase-label">Умножение</div>
+    <div id="progress-label">Решено: 0 / 12</div>
+  </div>
+  <div class="progressbar"><div class="progressbar-fill" id="progress-fill"></div></div>
+
+  <div class="card" id="task-card">
+    <div class="example" id="example">7 × 8</div>
+    <div class="answer-row">
+      <input type="text" inputmode="numeric" autocomplete="off" id="answer-input" placeholder="?">
+      <button class="btn primary" id="btn-check">Проверить</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+    <button class="btn" id="btn-got-it" hidden>Понял</button>
+  </div>
+</section>
+
+<!-- ============ ЭКРАН 3: РЕЗУЛЬТАТЫ ============ -->
+<section id="screen-result" class="screen">
+  <div class="result-card">
+    <div class="center">
+      <h1>Готово! 🎉</h1>
+      <p class="subtitle" id="result-summary"></p>
+    </div>
+    <div class="results" id="results"></div>
+    <div class="center">
+      <button class="btn primary" id="btn-restart">Ещё раз</button>
+    </div>
+  </div>
+</section>
+
+<!-- вспомогательные слои -->
+<div class="overlay" id="overlay"><div class="overlay-icon" id="overlay-icon"></div></div>
+<div class="banner" id="banner"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var TOTAL = 12;          // сколько верных ответов нужно на каждом этапе
+  var MIN = 2, MAX = 12;   // диапазон множителей / делителей
+
+  var els = {
+    screens: {
+      start:  document.getElementById('screen-start'),
+      task:   document.getElementById('screen-task'),
+      result: document.getElementById('screen-result')
+    },
+    phaseLabel:    document.getElementById('phase-label'),
+    progressLabel: document.getElementById('progress-label'),
+    progressFill:  document.getElementById('progress-fill'),
+    card:          document.getElementById('task-card'),
+    example:       document.getElementById('example'),
+    input:         document.getElementById('answer-input'),
+    btnCheck:      document.getElementById('btn-check'),
+    btnGotIt:      document.getElementById('btn-got-it'),
+    feedback:      document.getElementById('feedback'),
+    overlay:       document.getElementById('overlay'),
+    overlayIcon:   document.getElementById('overlay-icon'),
+    banner:        document.getElementById('banner'),
+    results:       document.getElementById('results'),
+    resultSummary: document.getElementById('result-summary'),
+    btnStart:      document.getElementById('btn-start'),
+    btnRestart:    document.getElementById('btn-restart')
+  };
+
+  var state = {
+    phase: 'multiplication', // текущий этап
+    queue: [],               // очередь нерешённых примеров
+    current: null,
+    solved: 0,
+    allExamples: [],         // все примеры обеих фаз (для финального экрана)
+    locked: false            // блокировка ввода (анимация / ожидание «Понял»)
+  };
+
+  /* ---------------- утилиты ---------------- */
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function showScreen(name) {
+    Object.keys(els.screens).forEach(function (k) {
+      els.screens[k].classList.toggle('active', k === name);
+    });
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------------- генерация примеров ---------------- */
+
+  function buildExamples(phase, count) {
+    var used = {}, list = [], guard = 0;
+
+    while (list.length < count && guard++ < 20000) {
+      var a, b, op, answer, key;
+
+      if (phase === 'multiplication') {
+        a = randInt(MIN, MAX);
+        b = randInt(MIN, MAX);
+        op = '×';
+        answer = a * b;
+        key = a + 'x' + b;
+      } else {
+        b = randInt(MIN, MAX);
+        var q = randInt(MIN, MAX);
+        a = b * q;
+        op = '÷';
+        answer = q;
+        key = a + '/' + b;
+      }
+
+      if (used[key]) continue;
+      used[key] = true;
+
+      var ex = { a: a, b: b, op: op, answer: answer, phase: phase, hadError: false };
+      list.push(ex);
+      state.allExamples.push(ex);
+    }
+    return list;
+  }
+
+  /* ---------------- ход игры ---------------- */
+
+  function startGame() {
+    state.allExamples = [];
+    state.phase = 'multiplication';
+    state.solved = 0;
+    state.locked = false;
+    state.queue = buildExamples('multiplication', TOTAL);
+    updateHeader();
+    showScreen('task');
+    nextExample();
+  }
+
+  function startPhase(phase) {
+    state.phase = phase;
+    state.solved = 0;
+    state.locked = false;
+    state.queue = buildExamples(phase, TOTAL);
+    updateHeader();
+    showScreen('task');
+    nextExample();
+  }
+
+  function updateHeader() {
+    els.phaseLabel.textContent = state.phase === 'multiplication' ? 'Умножение' : 'Деление';
+    els.progressLabel.textContent = 'Решено: ' + state.solved + ' / ' + TOTAL;
+    els.progressFill.style.width = (state.solved / TOTAL * 100) + '%';
+  }
+
+  function nextExample() {
+    if (state.queue.length === 0) { finishPhase(); return; }
+
+    var ex = state.queue.shift();
+    state.current = ex;
+    state.locked = false;
+
+    els.example.textContent = ex.a + ' ' + ex.op + ' ' + ex.b;
+    els.input.value = '';
+    els.input.disabled = false;
+    els.btnCheck.disabled = false;
+    els.feedback.textContent = '';
+    els.feedback.className = 'feedback';
+    els.btnGotIt.hidden = true;
+    els.card.classList.remove('correct', 'wrong');
+
+    els.input.focus();
+  }
+
+  function checkAnswer() {
+    if (state.locked || !state.current) return;
+
+    var raw = els.input.value.trim();
+    if (raw === '') { els.input.focus(); return; }
+
+    var val = parseInt(raw, 10);
+    if (!isFinite(val)) return;
+
+    var ex = state.current;
+    state.locked = true;
+    els.input.disabled = true;
+    els.btnCheck.disabled = true;
+
+    if (val === ex.answer) {
+      /* ---- ВЕРНО ---- */
+      state.solved++;
+      els.card.classList.add('correct');
+      playOverlay('✓', 'ok');
+      els.feedback.textContent = 'Верно!';
+      els.feedback.className = 'feedback ok';
+      updateHeader();
+
+      setTimeout(function () {
+        if (state.queue.length === 0) finishPhase();
+        else nextExample();
+      }, 850);
+
+    } else {
+      /* ---- НЕВЕРНО ---- */
+      ex.hadError = true;
+      els.card.classList.add('wrong');
+      playOverlay('✗', 'bad');
+      els.feedback.textContent = 'Правильный ответ: ' + ex.answer;
+      els.feedback.className = 'feedback bad';
+      els.btnGotIt.hidden = false;
+      els.btnGotIt.focus();
+    }
+  }
+
+  /* нажатие «Понял» — пример вернётся в конец очереди */
+  function onGotIt() {
+    if (!state.locked || !state.current) return;
+    state.queue.push(state.current);
+    nextExample();
+  }
+
+  function finishPhase() {
+    if (state.phase === 'multiplication') {
+      showBanner('Умножение пройдено! 🎉<br>Переходим к делению', function () {
+        startPhase('division');
+      });
+    } else {
+      showResults();
+    }
+  }
+
+  /* ---------------- финальный экран ---------------- */
+
+  function showResults() {
+    showScreen('result');
+
+    var errors = state.allExamples.filter(function (e) { return e.hadError; }).length;
+    var total = state.allExamples.length;
+
+    els.resultSummary.textContent =
+      'Примеров: ' + total +
+      ' · без ошибок: ' + (total - errors) +
+      ' · с ошибками: ' + errors;
+
+    els.results.innerHTML = '';
+
+    [
+      { phase: 'multiplication', title: 'Умножение' },
+      { phase: 'division',       title: 'Деление' }
+    ].forEach(function (g) {
+      var items = state.allExamples.filter(function (e) { return e.phase === g.phase; });
+      if (!items.length) return;
+
+      var h = document.createElement('h2');
+      h.textContent = g.title;
+      els.results.appendChild(h);
+
+      var grid = document.createElement('div');
+      grid.className = 'results-grid';
+
+      items.forEach(function (e) {
+        var div = document.createElement('div');
+        div.className = 'result-item ' + (e.hadError ? 'bad' : 'ok');
+        div.textContent = e.a + ' ' + e.op + ' ' + e.b + ' = ' + e.answer;
+        if (e.hadError) {
+          var note = document.createElement('span');
+          note.className = 'note';
+          note.textContent = 'решён с ошибкой';
+          div.appendChild(note);
+        }
+        grid.appendChild(div);
+      });
+
+      els.results.appendChild(grid);
+    });
+  }
+
+  /* ---------------- анимации ---------------- */
+
+  function playOverlay(symbol, kind) {
+    els.overlayIcon.textContent = symbol;
+    els.overlayIcon.className = 'overlay-icon ' + kind;
+    els.overlay.classList.remove('show');
+    void els.overlay.offsetWidth; // принудительный reflow для перезапуска анимации
+    els.overlay.classList.add('show');
+  }
+
+  function showBanner(html, cb) {
+    els.banner.innerHTML = html;
+    els.banner.classList.add('show');
+    setTimeout(function () {
+      els.banner.classList.remove('show');
+      setTimeout(cb, 320);
+    }, 1600);
+  }
+
+  /* ---------------- события ---------------- */
+
+  els.btnStart.addEventListener('click', startGame);
+  els.btnRestart.addEventListener('click', startGame);
+  els.btnCheck.addEventListener('click', checkAnswer);
+  els.btnGotIt.addEventListener('click', onGotIt);
+
+  els.input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); checkAnswer(); }
+  });
+
+  els.input.addEventListener('input', function () {
+    els.input.value = els.input.value.replace(/\D/g, '').slice(0, 5);
+  });
+
+})();
+</script>
+</body>
+</html>
