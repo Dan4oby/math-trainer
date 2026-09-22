@@ -17,6 +17,7 @@
     btnCheck:      document.getElementById('btn-check'),
     btnGotIt:      document.getElementById('btn-got-it'),
     feedback:      document.getElementById('feedback'),
+    hint:          document.getElementById('hint'),
     overlay:       document.getElementById('overlay'),
     overlayIcon:   document.getElementById('overlay-icon'),
     banner:        document.getElementById('banner'),
@@ -116,6 +117,12 @@
     } else {
       c.appendChild(createIntegerInput());
     }
+  }
+
+  function renderHint(phase) {
+    var h = phase && phase.hint;
+    if (typeof h === 'function') h = h();
+    els.hint.textContent = h || '';
   }
 
   function createSignToggle() {
@@ -301,6 +308,7 @@
     updateHeader();
     showScreen('task');
     renderAnswerFields(phaseMode(state.phase));
+    renderHint(state.phase);
 
     if (state.phase.intro && index > 0) {
       showBanner(state.phase.intro, nextExample);

@@ -18,6 +18,7 @@
         key: 'multiplication',
         label: 'Умножение',
         title: 'Умножение',
+        hint: 'Попробуй переставить множители местами — иногда так легче.',
         total: 12,
         inputMode: 'integer',          // ← одно числовое поле
         generate: function () {

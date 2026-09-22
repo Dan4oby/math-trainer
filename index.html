@@ -263,6 +263,19 @@
   .feedback.ok  { color: var(--green); }
   .feedback.bad { color: var(--red); }
 
+  .hint {
+    margin-top: 18px;
+    min-height: 20px;
+    font-size: 15px;
+    font-style: italic;
+    font-weight: 500;
+    color: #64748b;
+    opacity: .65;
+    user-select: none;
+    transition: opacity .2s ease;
+  }
+  .card.correct .hint,
+  .card.wrong   .hint { opacity: .25; }
   #btn-got-it {
     margin-top: 14px;
     background: var(--accent);
@@ -406,7 +419,9 @@
       <div class="answer-fields" id="answer-fields"></div>
       <button class="btn primary" id="btn-check">Проверить</button>
     </div>
+
     <div class="feedback" id="feedback"></div>
+    <div class="hint" id="hint"></div> 
     <button class="btn" id="btn-got-it" hidden>Понял</button>
   </div>
 </section>
