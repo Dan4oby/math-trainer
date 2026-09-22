@@ -61,7 +61,7 @@
             'Подключите файл генератора в index.html до app.js.');
       return null;
     }
-    var wanted = "signed";
+    var wanted = null;
     try { wanted = new URLSearchParams(location.search).get('g'); } catch (e) {}
 
     return (wanted && registry[wanted]) ? registry[wanted] : registry[ids[0]];
