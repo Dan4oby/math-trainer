@@ -386,6 +386,31 @@
     margin-top: 3px;
   }
   .center { text-align: center; }
+
+    /* ---------- кнопки-варианты (для виджета choice) ---------- */
+  .choice-btn {
+    min-width: 72px;
+    height: 72px;
+    padding: 0 18px;
+    border-radius: 14px;
+    border: 2px solid #cbd5e1;
+    background: #f8fafc;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 30px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .2s, transform .12s;
+  }
+  .choice-btn:hover:not(:disabled) { border-color: #94a3b8; }
+  .choice-btn:active:not(:disabled) { transform: scale(.96); }
+  .choice-btn.selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(79,70,229,.18);
+  }
+  .choice-btn:disabled { opacity: .5; cursor: default; }
 </style>
 </head>
 <body>
@@ -446,6 +471,7 @@
 
 <script src="generators/classic.js"></script>
 <script src="generators/signed.js"></script>
+<script src="generators/comparison.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
