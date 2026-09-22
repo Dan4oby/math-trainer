@@ -5,13 +5,13 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  var MIN = 2, MAX = 12;
+  var MIN = 2, MAX = 10;
 
   window.ExampleGenerators = window.ExampleGenerators || {};
 
   window.ExampleGenerators.classic = {
     id: 'classic',
-    name: 'Умножение и деление (2–12)',
+    name: 'Умножение и деление (2–10)',
     phases: [
 
       {
