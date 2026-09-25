@@ -25,7 +25,7 @@
         key: 'signed-multiplication',
         label: 'Умножение ±',
         title: 'Умножение (с отрицательными числами)',
-        total: 12,
+        total: 1,
 
         hint: [
           'Сначала посчитай умножение без знака, потом определи знак.',
@@ -54,7 +54,7 @@
           else if (variant === 'neg-neg') { a = -a; b = -b; }
 
           return {
-            text:   signChar(a) + ' × ' + signChar(b),
+            text:   '$' + signChar(a) + ' * ' + signChar(b) + '$',
             answer: a * b,
             key:    'm:' + a + 'x' + b
           };
@@ -82,7 +82,7 @@
         key: 'signed-division',
         label: 'Деление ±',
         title: 'Деление (с отрицательными числами)',
-        total: 12,
+        total: 1,
         intro: 'Умножение со знаками пройдено! 🎉<br>Переходим к делению',
 
         hint: [
@@ -113,7 +113,7 @@
           var answer = (a < 0) === (b < 0) ? q : -q;
 
           return {
-            text:   signChar(a) + ' ÷ ' + signChar(b),
+            text:   '$\\frac{' + signChar(a) + '}{' + signChar(b) + '}$',
             answer: answer,
             key:    'd:' + a + '/' + b
           };

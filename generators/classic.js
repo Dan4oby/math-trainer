@@ -11,7 +11,7 @@
 
   window.ExampleGenerators.classic = {
     id: 'classic',
-    name: 'Умножение и деление (2–10)',
+    name: 'Умножение и деление (2–12)',
     phases: [
 
       /* ── Умножение ─────────────────────────────── */
@@ -40,7 +40,7 @@
           var a = randInt(MIN, MAX);
           var b = randInt(MIN, MAX);
           return {
-            text:   a + ' × ' + b,
+            text:   '$' + a + ' * ' + b + '$',
             answer: a * b,
             key:    a + 'x' + b
           };
@@ -78,7 +78,7 @@
           var b = randInt(MIN, MAX);
           var q = randInt(MIN, MAX);
           return {
-            text:   (b * q) + ' ÷ ' + b,
+            text:   '$\\frac{' + (b * q) + '}{' + b + '}$',
             answer: q,
             key:    (b * q) + '/' + b
           };

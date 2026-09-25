@@ -37,25 +37,51 @@
     solved:      0,
     allExamples: [],
     locked:      false,
-    widgets:     []   // [{ id, handle }] — собранные с текущего примера
+    widgets:     []
   };
 
   /* ───────────── реестры элементов ───────────── */
   var TopElements    = window.TopElements    = window.TopElements    || {};
   var AnswerElements = window.AnswerElements = window.AnswerElements || {};
 
-  /* ── встроенный элемент верхней панели: просто строка примера ── */
+  /* ───────────── рендер текста с LaTeX ───────────── */
+  /* Если строка содержит $...$ (или $$...$$, \(...\), \[...\]),
+     KaTeX через auto-render сам найдёт формулы и отрисует их,
+     а обычный текст оставит как есть. Если KaTeX не подключён —
+     строка выводится как обычный текст. */
+  function renderText(el, text) {
+    text = text == null ? '' : String(text);
+    el.textContent = text;
+
+    if (typeof window.renderMathInElement !== 'function') return;
+
+    try {
+      window.renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true  },
+          { left: '$',  right: '$',  display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true  }
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      /* если что-то пошло не так — оставляем исходный текст */
+    }
+  }
+
+  /* ── встроенный элемент верхней панели: строка примера ── */
   TopElements['example-string'] = {
     build: function (container, descriptor, ctx) {
       var div = document.createElement('div');
       div.className = 'example';
-      div.textContent = ctx.example.text;
+      renderText(div, ctx.example.text);
       container.appendChild(div);
-      return null;                 // у верхней панели нет «ручки»
+      return null;
     }
   };
 
-  /* ── встроенный элемент нижней панели: поле положительного числа ── */
+  /* ── поле положительного числа ── */
   AnswerElements.number = {
     build: function (container, descriptor, ctx) {
       var input = document.createElement('input');
@@ -85,7 +111,7 @@
     }
   };
 
-  /* ── встроенный элемент нижней панели: кнопка «±» ── */
+  /* ── кнопка «±» ── */
   AnswerElements.sign = {
     build: function (container, descriptor, ctx) {
       var st = { value: 1 };
@@ -113,7 +139,7 @@
     }
   };
 
-  /* ── встроенный элемент нижней панели: чекбокс ── */
+  /* ── чекбокс (подпись тоже поддерживает LaTeX) ── */
   AnswerElements.checkbox = {
     build: function (container, descriptor, ctx) {
       var wrap = document.createElement('label');
@@ -125,7 +151,7 @@
 
       var text = document.createElement('span');
       text.className = 'checkbox-label';
-      text.textContent = descriptor.label || '';
+      renderText(text, descriptor.label || '');
 
       wrap.appendChild(box);
       wrap.appendChild(text);
@@ -175,7 +201,6 @@
   }
 
   /* ───────────── построение панелей ───────────── */
-
   function resolveSpec(spec, example) {
     if (typeof spec === 'function') return spec(example) || [];
     return spec || [];
@@ -214,7 +239,6 @@
   }
 
   /* ───────────── очередь и ход игры ───────────── */
-
   function buildQueue(phase) {
     var used = {}, list = [], guard = 0;
     while (list.length < phase.total && guard++ < 20000) {
@@ -246,7 +270,7 @@
       if (!h.length) { els.hint.textContent = ''; return; }
       h = h[Math.floor(Math.random() * h.length)];
     }
-    els.hint.textContent = h || '';
+    renderText(els.hint, h || '');
   }
 
   function startGame() {
@@ -356,7 +380,7 @@
             ? state.phase.formatAnswer(state.current)
             : String(state.current.answer));
 
-      els.feedback.textContent = 'Правильный ответ: ' + ansText;
+      renderText(els.feedback, 'Правильный ответ: ' + ansText);
       els.feedback.className   = 'feedback bad';
       els.btnGotIt.hidden      = false;
       els.btnGotIt.focus();
@@ -408,7 +432,7 @@
           ? phase.formatAnswer(e)
           : String(e.answer);
 
-        div.textContent = e.text + '   ' + answerText;
+        renderText(div, e.text + '   ' + answerText);
 
         if (e.hadError) {
           var note = document.createElement('span');

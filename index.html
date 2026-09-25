@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Тренажёр: умножение и деление</title>
+<title>Тренажёр по предметам</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
 <style>
   :root {
     --green: #16a34a;
@@ -456,11 +459,9 @@
 <!-- ============ ЭКРАН 1: СТАРТ ============ -->
 <section id="screen-start" class="screen active">
   <div class="start-card">
-    <h1>Тренажёр счёта</h1>
-    <p class="subtitle">Умножение и деление целых чисел</p>
+    <h1>Тренажёр по предметам</h1>
+    <p class="subtitle">placeholder</p>
     <ul class="rules">
-      <li>✖️ <b>12</b> верно решённых примеров на умножение</li>
-      <li>➗ <b>12</b> верно решённых примеров на деление</li>
       <li>🎯 Ошибочный пример вернётся к тебе позже</li>
     </ul>
     <button class="btn primary" id="btn-start">Начать</button>
@@ -508,6 +509,8 @@
 <div class="overlay" id="overlay"><div class="overlay-icon" id="overlay-icon"></div></div>
 <div class="banner" id="banner"></div>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script src="generators/classic.js"></script>
 <script src="generators/test.js"></script>
 <script src="generators/signed.js"></script>
