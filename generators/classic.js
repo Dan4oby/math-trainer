@@ -14,42 +14,82 @@
     name: 'Умножение и деление (2–10)',
     phases: [
 
+      /* ── Умножение ─────────────────────────────── */
       {
         key: 'multiplication',
         label: 'Умножение',
         title: 'Умножение',
-        hint: [
-          'Попробуй переставить числа местами — иногда так легче.',
-          'Попробуй умножить на 10 число и из этого вычесть столько раз, сколько нужно.'
-        ],
         total: 12,
-        inputMode: 'integer',          // ← одно числовое поле
+
+        hint: [
+          'Попробуй переставить множители местами — иногда так легче.',
+          'Разложи один из множителей: 8 × 7 = 8 × 5 + 8 × 2.',
+          'Округли до десятка, потом отними лишнее: 9 × 7 = 10 × 7 − 7.',
+          'Если один множитель чётный, посчитай половину и умножь на два.'
+        ],
+
+        /* верхняя панель: одна строка — текст примера */
+        top: [{ type: 'example-string' }],
+
+        /* нижняя панель: одна строка, одно числовое поле */
+        bottom: [
+          [{ type: 'number', id: 'ans', placeholder: '?' }]
+        ],
+
         generate: function () {
           var a = randInt(MIN, MAX);
           var b = randInt(MIN, MAX);
           return {
-            text: a + ' × ' + b,
+            text:   a + ' × ' + b,
             answer: a * b,
-            key: a + 'x' + b
+            key:    a + 'x' + b
           };
+        },
+
+        check: function (collected, ex) {
+          return collected.ans === ex.answer;
+        },
+
+        formatAnswer: function (ex) {
+          return String(ex.answer);
         }
       },
 
+      /* ── Деление ───────────────────────────────── */
       {
         key: 'division',
         label: 'Деление',
         title: 'Деление',
         total: 12,
-        inputMode: 'integer',
         intro: 'Умножение пройдено! 🎉<br>Переходим к делению',
+
+        hint: [
+          'Вспомни таблицу умножения: какое число умножить на делитель, чтобы получить делимое?',
+          'Деление — это умножение наоборот.',
+          'Проверь себя: умножь получившийся ответ на делитель — должно получиться делимое.'
+        ],
+
+        top: [{ type: 'example-string' }],
+        bottom: [
+          [{ type: 'number', id: 'ans', placeholder: '?' }]
+        ],
+
         generate: function () {
           var b = randInt(MIN, MAX);
           var q = randInt(MIN, MAX);
           return {
-            text: (b * q) + ' ÷ ' + b,
+            text:   (b * q) + ' ÷ ' + b,
             answer: q,
-            key: (b * q) + '/' + b
+            key:    (b * q) + '/' + b
           };
+        },
+
+        check: function (collected, ex) {
+          return collected.ans === ex.answer;
+        },
+
+        formatAnswer: function (ex) {
+          return String(ex.answer);
         }
       }
 

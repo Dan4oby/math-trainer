@@ -28,7 +28,6 @@
     padding: 20px;
   }
 
-  /* ---------- экраны ---------- */
   .screen { display: none; width: 100%; max-width: 760px; }
   .screen.active { display: block; animation: fadeIn .35s ease both; }
 
@@ -37,7 +36,6 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ---------- стартовый экран ---------- */
   .start-card {
     background: #fff;
     border-radius: 26px;
@@ -60,7 +58,6 @@
   }
   .rules li b { color: var(--accent); }
 
-  /* ---------- кнопки ---------- */
   .btn {
     border: none;
     border-radius: 14px;
@@ -82,7 +79,6 @@
   }
   .btn:disabled { opacity: .45; cursor: default; }
 
-  /* ---------- верхняя панель ---------- */
   .topbar {
     display: flex;
     justify-content: space-between;
@@ -114,7 +110,6 @@
     transition: width .45s cubic-bezier(.22,1,.36,1);
   }
 
-  /* ---------- карточка с примером ---------- */
   .card {
     background: #fff;
     border-radius: 26px;
@@ -151,16 +146,22 @@
     85% { transform: translateX(-3px); }
   }
 
+  /* ---------- верхняя панель (заполняется движком) ---------- */
+  .top-panel {
+    margin: 0 0 8px;
+  }
+
   .example {
-    font-size: clamp(44px, 12vw, 78px);
-    font-weight: 800;
+    font-size: clamp(30px, 12vw, 50px);
+    font-weight: 600;
     letter-spacing: 2px;
     font-variant-numeric: tabular-nums;
-    margin: 4px 0 28px;
+    margin: 4px 0 20px;
     line-height: 1.1;
     user-select: none;
   }
 
+  /* ---------- строка с нижней панелью и кнопкой «Проверить» ---------- */
   .answer-row {
     display: flex;
     gap: 12px;
@@ -169,16 +170,23 @@
     flex-wrap: wrap;
   }
 
-  /* контейнер, внутри которого app.js строит поля ответа */
-  .answer-fields {
+  /* ---------- нижняя панель: 2D-сетка ---------- */
+  .bottom-panel {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
     gap: 12px;
   }
+  .bottom-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
 
-  /* одиночное числовое поле (integer / signed-integer) */
-  #answer-input {
+  /* ---------- поле ввода числа (элемент number) ---------- */
+  .answer-input {
     width: 165px;
     font-family: inherit;
     font-size: 32px;
@@ -191,10 +199,10 @@
     color: var(--ink);
     transition: border-color .2s, box-shadow .2s, background .2s;
   }
-  #answer-input:focus { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,.18); }
-  #answer-input:disabled { background: #f1f5f9; color: #94a3b8; }
+  .answer-input:focus { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,.18); }
+  .answer-input:disabled { background: #f1f5f9; color: #94a3b8; }
 
-  /* кнопка переключения знака (±) */
+  /* ---------- кнопка «±» (элемент sign) ---------- */
   .sign-toggle {
     width: 58px;
     height: 58px;
@@ -224,44 +232,92 @@
   }
   .sign-toggle:disabled { opacity: .5; cursor: default; }
 
-  /* дробное поле ввода: числитель / черта / знаменатель */
-  .fraction-input {
+  /* ---------- чекбокс (элемент checkbox) ---------- */
+  .checkbox-wrap {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-  .fraction-part {
-    width: 96px;
-    font-family: inherit;
-    font-size: 26px;
-    font-weight: 700;
-    text-align: center;
-    padding: 6px 10px;
-    border-radius: 10px;
+    align-items: flex-start;      /* галочка остаётся сверху при переносе */
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 14px;
     border: 2px solid #cbd5e1;
-    outline: none;
-    color: var(--ink);
-    transition: border-color .2s, box-shadow .2s, background .2s;
+    background: #f8fafc;
+    cursor: pointer;
+    user-select: none;
+    font-size: 20px;
+    font-weight: 600;
+    max-width: 100%;              /* не вылезает за карточку */
+    text-align: left;
+    transition: border-color .15s, background .15s, box-shadow .15s;
   }
-  .fraction-part:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.18); }
-  .fraction-part:disabled { background: #f1f5f9; color: #94a3b8; }
+    /* ── базовая заготовка для анимации ── */
+  .checkbox-wrap {
+    position: relative;              /* нужно для позиционирования кольца */
+    overflow: visible;
+  }
 
-  .fraction-bar {
-    width: 96px;
-    height: 3px;
-    background: var(--ink);
-    border-radius: 2px;
+  .checkbox-wrap input[type="checkbox"] {
+    transition: transform .15s ease;
   }
 
-  .feedback {
-    min-height: 34px;
-    margin-top: 20px;
-    font-size: 21px;
-    font-weight: 700;
+  /* сам чекбокс пульсирует при отметке */
+  .checkbox-wrap input[type="checkbox"]:checked {
+    animation: cbPop .42s cubic-bezier(.22,1.4,.36,1);
   }
-  .feedback.ok  { color: var(--green); }
-  .feedback.bad { color: var(--red); }
+
+  @keyframes cbPop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.35); }
+    60%  { transform: scale(.9); }
+    100% { transform: scale(1); }
+  }
+
+  /* расходящееся кольцо вокруг чекбокса */
+  .checkbox-wrap::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    /* центр чекбокса: padding-left (18px) + половина ширины (11px) */
+    left: calc(18px + 11px);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    transform: translate(-50%, -50%) scale(.3);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .checkbox-wrap:has(input:checked)::after {
+    animation: cbRing .55s ease-out;
+  }
+
+  @keyframes cbRing {
+    0%   { transform: translate(-50%, -50%) scale(.3); opacity: .95; }
+    70%  { transform: translate(-50%, -50%) scale(3.6); opacity: .35; }
+    100% { transform: translate(-50%, -50%) scale(6.4); opacity: 0; }
+  }
+
+  /* приятная подсветка всей плашки */
+  .checkbox-wrap:has(input:checked) {
+    border-color: var(--accent);
+    background: #eef2ff;
+    box-shadow: 0 0 0 4px rgba(79,70,229,.12);
+  }
+  .checkbox-wrap:hover { border-color: #94a3b8; }
+  .checkbox-wrap input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;               /* галочка не сжимается */
+    margin-top: 3px;              /* визуально выравнивается по первой строке */
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .checkbox-wrap input[type="checkbox"]:disabled { cursor: default; }
+  .checkbox-label {
+    white-space: normal;          /* разрешаем перенос */
+    word-break: break-word;
+    line-height: 1.35;
+  }
 
   .hint {
     margin-top: 18px;
@@ -276,6 +332,16 @@
   }
   .card.correct .hint,
   .card.wrong   .hint { opacity: .25; }
+
+  .feedback {
+    min-height: 34px;
+    margin-top: 20px;
+    font-size: 21px;
+    font-weight: 700;
+  }
+  .feedback.ok  { color: var(--green); }
+  .feedback.bad { color: var(--red); }
+
   #btn-got-it {
     margin-top: 14px;
     background: var(--accent);
@@ -283,7 +349,6 @@
     box-shadow: 0 12px 26px -12px var(--accent);
   }
 
-  /* ---------- всплывающие значки ---------- */
   .overlay {
     position: fixed;
     inset: 0;
@@ -310,7 +375,6 @@
     100% { opacity: 0; transform: scale(1.25); }
   }
 
-  /* ---------- баннер между этапами ---------- */
   .banner {
     position: fixed;
     left: 50%;
@@ -332,7 +396,6 @@
   }
   .banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
-  /* ---------- экран результатов ---------- */
   .result-card {
     background: #fff;
     border-radius: 26px;
@@ -386,31 +449,6 @@
     margin-top: 3px;
   }
   .center { text-align: center; }
-
-    /* ---------- кнопки-варианты (для виджета choice) ---------- */
-  .choice-btn {
-    min-width: 72px;
-    height: 72px;
-    padding: 0 18px;
-    border-radius: 14px;
-    border: 2px solid #cbd5e1;
-    background: #f8fafc;
-    color: var(--ink);
-    font-family: inherit;
-    font-size: 30px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .2s, transform .12s;
-  }
-  .choice-btn:hover:not(:disabled) { border-color: #94a3b8; }
-  .choice-btn:active:not(:disabled) { transform: scale(.96); }
-  .choice-btn.selected {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-    box-shadow: 0 0 0 4px rgba(79,70,229,.18);
-  }
-  .choice-btn:disabled { opacity: .5; cursor: default; }
 </style>
 </head>
 <body>
@@ -438,15 +476,17 @@
   <div class="progressbar"><div class="progressbar-fill" id="progress-fill"></div></div>
 
   <div class="card" id="task-card">
-    <div class="example" id="example">7 × 8</div>
+    <!-- верхняя панель: строится движком из phase.top -->
+    <div class="top-panel" id="top-panel"></div>
+
+    <!-- нижняя панель (2D-сетка) + кнопка «Проверить» -->
     <div class="answer-row">
-      <!-- Поля ответа строит app.js в зависимости от phase.inputMode -->
-      <div class="answer-fields" id="answer-fields"></div>
+      <div class="bottom-panel" id="bottom-panel"></div>
       <button class="btn primary" id="btn-check">Проверить</button>
     </div>
 
+    <div class="hint" id="hint"></div>
     <div class="feedback" id="feedback"></div>
-    <div class="hint" id="hint"></div> 
     <button class="btn" id="btn-got-it" hidden>Понял</button>
   </div>
 </section>
@@ -465,13 +505,11 @@
   </div>
 </section>
 
-<!-- вспомогательные слои -->
 <div class="overlay" id="overlay"><div class="overlay-icon" id="overlay-icon"></div></div>
 <div class="banner" id="banner"></div>
 
 <script src="generators/classic.js"></script>
-<script src="generators/signed.js"></script>
-<script src="generators/comparison.js"></script>
+<script src="generators/test.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

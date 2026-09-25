@@ -12,8 +12,8 @@
     progressLabel: document.getElementById('progress-label'),
     progressFill:  document.getElementById('progress-fill'),
     card:          document.getElementById('task-card'),
-    example:       document.getElementById('example'),
-    answerFields:  document.getElementById('answer-fields'),
+    topPanel:      document.getElementById('top-panel'),
+    bottomPanel:   document.getElementById('bottom-panel'),
     btnCheck:      document.getElementById('btn-check'),
     btnGotIt:      document.getElementById('btn-got-it'),
     feedback:      document.getElementById('feedback'),
@@ -37,8 +37,121 @@
     solved:      0,
     allExamples: [],
     locked:      false,
-    widget:      null,   // handle текущего виджета
-    widgetDef:   null    // определение текущего виджета (для format/compare)
+    widgets:     []   // [{ id, handle }] — собранные с текущего примера
+  };
+
+  /* ───────────── реестры элементов ───────────── */
+  var TopElements    = window.TopElements    = window.TopElements    || {};
+  var AnswerElements = window.AnswerElements = window.AnswerElements || {};
+
+  /* ── встроенный элемент верхней панели: просто строка примера ── */
+  TopElements['example-string'] = {
+    build: function (container, descriptor, ctx) {
+      var div = document.createElement('div');
+      div.className = 'example';
+      div.textContent = ctx.example.text;
+      container.appendChild(div);
+      return null;                 // у верхней панели нет «ручки»
+    }
+  };
+
+  /* ── встроенный элемент нижней панели: поле положительного числа ── */
+  AnswerElements.number = {
+    build: function (container, descriptor, ctx) {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.autocomplete = 'off';
+      input.className = 'answer-input';
+      input.placeholder = descriptor.placeholder || '?';
+      input.addEventListener('input', function () {
+        input.value = input.value.replace(/\D/g, '').slice(0, 6);
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); ctx.submit(); }
+      });
+      container.appendChild(input);
+      return {
+        read:  function () {
+          var raw = input.value.trim();
+          if (raw === '') return null;
+          var v = parseInt(raw, 10);
+          return isFinite(v) ? v : null;
+        },
+        lock:  function () { input.disabled = true; },
+        reset: function () { input.value = ''; input.disabled = false; },
+        focus: function () { input.focus(); }
+      };
+    }
+  };
+
+  /* ── встроенный элемент нижней панели: кнопка «±» ── */
+  AnswerElements.sign = {
+    build: function (container, descriptor, ctx) {
+      var st = { value: 1 };
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sign-toggle';
+      btn.textContent = '−';
+      btn.title = 'Переключить знак';
+      btn.setAttribute('aria-label', 'Переключить знак');
+      btn.addEventListener('click', function () {
+        st.value = -st.value;
+        btn.classList.toggle('active', st.value === -1);
+      });
+      container.appendChild(btn);
+      return {
+        read:  function () { return st.value; },
+        lock:  function () { btn.disabled = true; },
+        reset: function () {
+          st.value = 1;
+          btn.disabled = false;
+          btn.classList.remove('active');
+        },
+        focus: function () { btn.focus(); }
+      };
+    }
+  };
+
+  /* ── встроенный элемент нижней панели: чекбокс ── */
+  AnswerElements.checkbox = {
+    build: function (container, descriptor, ctx) {
+      var wrap = document.createElement('label');
+      wrap.className = 'checkbox-wrap';
+      wrap.dataset.group = descriptor.group || '';
+
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+
+      var text = document.createElement('span');
+      text.className = 'checkbox-label';
+      text.textContent = descriptor.label || '';
+
+      wrap.appendChild(box);
+      wrap.appendChild(text);
+
+      /* radio-поведение внутри одной группы */
+      if (descriptor.group) {
+        box.addEventListener('change', function () {
+          if (!box.checked) return;
+          var all = ctx.card.querySelectorAll(
+            '.checkbox-wrap[data-group="' + descriptor.group + '"] input[type="checkbox"]'
+          );
+          Array.prototype.forEach.call(all, function (other) {
+            if (other !== box) other.checked = false;
+          });
+        });
+      }
+
+      container.appendChild(wrap);
+
+      return {
+        read:  function () { return !!box.checked; },
+        lock:  function () { box.disabled = true; },
+        reset: function () { box.checked = false; box.disabled = false; },
+        focus: function () { box.focus(); }
+      };
+    }
   };
 
   /* ───────────── утилиты ───────────── */
@@ -61,252 +174,47 @@
     return (wanted && registry[wanted]) ? registry[wanted] : registry[ids[0]];
   }
 
-  function gcd(a, b) {
-    a = Math.abs(a);
-    while (b) { var t = b; b = a % b; a = t; }
-    return a || 1;
-  }
-  function normalizeFraction(f) {
-    if (f === null || f === undefined) return null;
-    if (typeof f === 'number') f = { num: f, den: 1 };
-    var num = f.num, den = f.den;
-    if (!den) return null;
-    if (den < 0) { num = -num; den = -den; }
-    if (num === 0) return { num: 0, den: 1 };
-    var g = gcd(num, den);
-    return { num: num / g, den: den / g };
+  /* ───────────── построение панелей ───────────── */
+
+  function resolveSpec(spec, example) {
+    if (typeof spec === 'function') return spec(example) || [];
+    return spec || [];
   }
 
-  /* ───────────── реестр виджетов ввода ───────────── */
-  var AnswerInputs = window.AnswerInputs = window.AnswerInputs || {};
-
-  /* вспомогательные конструкторы полей */
-  function makeNumericInput(id, placeholder) {
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.inputMode = 'numeric';
-    input.autocomplete = 'off';
-    input.id = id;
-    input.placeholder = placeholder;
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); checkAnswer(); }
+  function buildTopPanel(phase, example) {
+    els.topPanel.innerHTML = '';
+    resolveSpec(phase.top, example).forEach(function (desc) {
+      var el = TopElements[desc.type];
+      if (el) el.build(els.topPanel, desc, { example: example });
     });
-    input.addEventListener('input', function () {
-      input.value = input.value.replace(/\D/g, '').slice(0, 6);
-    });
-    return input;
   }
 
-  function makeSignToggle(signState) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'sign-toggle';
-    b.textContent = '−';
-    b.title = 'Переключить знак';
-    b.setAttribute('aria-label', 'Переключить знак');
-    b.addEventListener('click', function () {
-      signState.negative = !signState.negative;
-      b.classList.toggle('active', signState.negative);
-    });
-    return b;
-  }
+  function buildBottomPanel(phase, example) {
+    els.bottomPanel.innerHTML = '';
+    state.widgets = [];
 
-  function makeFractionPart(id, placeholder) {
-    var input = makeNumericInput(id, placeholder);
-    input.className = 'fraction-part';
-    return input;
-  }
+    var ctx = {
+      example: example,
+      card:    els.card,
+      submit:  checkAnswer
+    };
 
-  /* ── integer ── */
-  AnswerInputs.integer = {
-    build: function (container) {
-      var input = makeNumericInput('answer-input', '?');
-      container.appendChild(input);
-      return {
-        read:  function () {
-          var raw = input.value.trim();
-          if (raw === '') return null;
-          var v = parseInt(raw, 10);
-          return isFinite(v) ? v : null;
-        },
-        lock:  function () { input.disabled = true; },
-        reset: function () { input.value = ''; input.disabled = false; },
-        focus: function () { input.focus(); }
-      };
-    },
-    format: function (v) { return String(v); }
-  };
+    resolveSpec(phase.bottom, example).forEach(function (rowSpec) {
+      var row = document.createElement('div');
+      row.className = 'bottom-row';
+      els.bottomPanel.appendChild(row);
 
-  /* ── signed-integer ── */
-  AnswerInputs['signed-integer'] = {
-    build: function (container) {
-      var signState = { negative: false };
-      var toggle = makeSignToggle(signState);
-      var input  = makeNumericInput('answer-input', '?');
-      container.appendChild(toggle);
-      container.appendChild(input);
-      return {
-        read: function () {
-          var raw = input.value.trim();
-          if (raw === '') return null;
-          var v = parseInt(raw, 10);
-          if (!isFinite(v)) return null;
-          return signState.negative ? -v : v;
-        },
-        lock: function () {
-          input.disabled = true;
-          toggle.disabled = true;
-        },
-        reset: function () {
-          input.value = '';
-          input.disabled = false;
-          toggle.disabled = false;
-          signState.negative = false;
-          toggle.classList.remove('active');
-        },
-        focus: function () { input.focus(); }
-      };
-    },
-    format: function (v) { return String(v); }
-  };
-
-  /* ── fraction ── */
-  AnswerInputs.fraction = {
-    build: function (container) {
-      var signState = { negative: false };
-      var toggle = makeSignToggle(signState);
-      var wrap = document.createElement('div');
-      wrap.className = 'fraction-input';
-      var num = makeFractionPart('answer-num', '?');
-      var bar = document.createElement('div');
-      bar.className = 'fraction-bar';
-      var den = makeFractionPart('answer-den', '?');
-      wrap.appendChild(num);
-      wrap.appendChild(bar);
-      wrap.appendChild(den);
-      container.appendChild(toggle);
-      container.appendChild(wrap);
-      return {
-        read: function () {
-          var ns = num.value.trim(), ds = den.value.trim();
-          if (ns === '' || ds === '') return null;
-          var n = parseInt(ns, 10), d = parseInt(ds, 10);
-          if (!isFinite(n) || !isFinite(d) || d === 0) return null;
-          if (signState.negative) n = -n;
-          return { num: n, den: d };
-        },
-        lock: function () {
-          num.disabled = true;
-          den.disabled = true;
-          toggle.disabled = true;
-        },
-        reset: function () {
-          num.value = ''; den.value = '';
-          num.disabled = false; den.disabled = false;
-          toggle.disabled = false;
-          signState.negative = false;
-          toggle.classList.remove('active');
-        },
-        focus: function () { num.focus(); }
-      };
-    },
-    format: function (v) {
-      var f = normalizeFraction(v);
-      if (!f) return String(v);
-      return f.den === 1 ? String(f.num) : f.num + '/' + f.den;
-    },
-    compare: function (user, correct) {
-      var u = normalizeFraction(user), c = normalizeFraction(correct);
-      if (!u || !c) return false;
-      return u.num === c.num && u.den === c.den;
-    }
-  };
-
-  /* ── choice — кнопки-варианты ── */
-  AnswerInputs.choice = {
-    build: function (container, phase) {
-      var options = (phase && phase.options) || [];
-      var selected = { value: null };
-      var buttons = [];
-
-      options.forEach(function (opt) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'choice-btn';
-        b.textContent = opt.label != null ? opt.label : String(opt.value);
-        b.addEventListener('click', function () {
-          if (b.disabled) return;
-          selected.value = opt.value;
-          buttons.forEach(function (x) { x.classList.remove('selected'); });
-          b.classList.add('selected');
-        });
-        b.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') { e.preventDefault(); checkAnswer(); }
-        });
-        buttons.push(b);
-        container.appendChild(b);
+      (rowSpec || []).forEach(function (desc) {
+        var el = AnswerElements[desc.type];
+        if (!el) return;
+        var handle = el.build(row, desc, ctx);
+        if (handle) state.widgets.push({ id: desc.id, handle: handle });
       });
-
-      return {
-        read:  function () { return selected.value; },
-        lock:  function () { buttons.forEach(function (b) { b.disabled = true; }); },
-        reset: function () {
-          selected.value = null;
-          buttons.forEach(function (b) {
-            b.disabled = false;
-            b.classList.remove('selected');
-          });
-        },
-        focus: function () { if (buttons[0]) buttons[0].focus(); }
-      };
-    },
-    format: function (v) { return v == null ? '—' : String(v); }
-  };
-
-  /* ───────────── выбор виджета для фазы ───────────── */
-  function widgetDefinitionFor(phase) {
-    if (phase.inputWidget) return phase.inputWidget;
-    var name = phase.inputMode || 'integer';
-    return AnswerInputs[name] || AnswerInputs.integer;
+    });
   }
 
-  function formatValue(def, v) {
-    if (def && typeof def.format === 'function') return def.format(v);
-    return String(v);
-  }
+  /* ───────────── очередь и ход игры ───────────── */
 
-  function answersEqual(user, correct) {
-    if (state.phase && typeof state.phase.compare === 'function') {
-      return state.phase.compare(user, correct);
-    }
-    if (state.widgetDef && typeof state.widgetDef.compare === 'function') {
-      return state.widgetDef.compare(user, correct);
-    }
-    return user === correct;
-  }
-
-  /* ───────────── построение UI фазы ───────────── */
-  function renderAnswerFields(phase) {
-    var c = els.answerFields;
-    c.innerHTML = '';
-    state.widgetDef = widgetDefinitionFor(phase);
-    state.widget    = state.widgetDef.build(c, phase);
-  }
-
-  function renderHint(phase) {
-    var h = phase && phase.hint;
-
-    if (typeof h === 'function') h = h(state.current);
-
-    if (Array.isArray(h)) {
-      if (!h.length) { els.hint.textContent = ''; return; }
-      h = h[Math.floor(Math.random() * h.length)];
-    }
-
-    els.hint.textContent = h || '';
-  }
-
-  /* ───────────── очередь примеров ───────────── */
   function buildQueue(phase) {
     var used = {}, list = [], guard = 0;
     while (list.length < phase.total && guard++ < 20000) {
@@ -315,14 +223,12 @@
       var key = ex.key || ex.text;
       if (used[key]) continue;
       used[key] = true;
-      list.push({
-        text:       ex.text,
-        answer:     ex.answer,
+      list.push(Object.assign({}, ex, {
         phaseKey:   phase.key,
         phaseTitle: phase.title || phase.label,
-        widgetDef:  state.widgetDef,   // ссылка на виджет — для format на финале
+        phaseRef:   phase,
         hadError:   false
-      });
+      }));
     }
     return list;
   }
@@ -333,7 +239,16 @@
     els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
   }
 
-  /* ───────────── ход игры ───────────── */
+  function renderHint(phase) {
+    var h = phase && phase.hint;
+    if (typeof h === 'function') h = h(state.current);
+    if (Array.isArray(h)) {
+      if (!h.length) { els.hint.textContent = ''; return; }
+      h = h[Math.floor(Math.random() * h.length)];
+    }
+    els.hint.textContent = h || '';
+  }
+
   function startGame() {
     var gen = pickGenerator();
     if (!gen) return;
@@ -348,13 +263,11 @@
     state.solved     = 0;
     state.locked     = false;
 
-    renderAnswerFields(state.phase);
     state.queue       = buildQueue(state.phase);
     state.allExamples = state.allExamples.concat(state.queue);
 
     updateHeader();
     showScreen('task');
-    
 
     if (state.phase.intro && index > 0) showBanner(state.phase.intro, nextExample);
     else nextExample();
@@ -366,7 +279,9 @@
     state.current = state.queue.shift();
     state.locked  = false;
 
-    els.example.textContent  = state.current.text;
+    buildTopPanel(state.phase, state.current);
+    buildBottomPanel(state.phase, state.current);
+
     els.feedback.textContent = '';
     els.feedback.className   = 'feedback';
     els.btnGotIt.hidden      = true;
@@ -374,21 +289,51 @@
     els.card.classList.remove('correct', 'wrong');
 
     renderHint(state.phase);
-    if (state.widget) { state.widget.reset(); state.widget.focus(); }
+
+    if (state.widgets.length && state.widgets[0].handle.focus) {
+      state.widgets[0].handle.focus();
+    }
+  }
+
+  function collectAnswers() {
+    var out = {};
+    var firstEmpty = null;
+    state.widgets.forEach(function (w) {
+      var v = w.handle.read();
+      out[w.id] = v;
+      if (v === null && !firstEmpty) firstEmpty = w;
+    });
+    return { collected: out, firstEmpty: firstEmpty };
   }
 
   function checkAnswer() {
-    if (state.locked || !state.current || !state.widget) return;
+    if (state.locked || !state.current) return;
+    if (typeof state.phase.check !== 'function') {
+      console.warn('Фаза «' + state.phase.key + '» не задаёт функцию check.');
+      return;
+    }
 
-    var user = state.widget.read();
-    if (user === null) { state.widget.focus(); return; }
+    var bag = collectAnswers();
+    if (bag.firstEmpty) {
+      if (bag.firstEmpty.handle.focus) bag.firstEmpty.handle.focus();
+      return;
+    }
 
-    var ex = state.current;
+    var result = state.phase.check(bag.collected, state.current);
+
+    var correct, expected;
+    if (result && typeof result === 'object') {
+      correct  = !!result.correct;
+      expected = result.expected;
+    } else {
+      correct = !!result;
+    }
+
     state.locked = true;
-    state.widget.lock();
+    state.widgets.forEach(function (w) { w.handle.lock && w.handle.lock(); });
     els.btnCheck.disabled = true;
 
-    if (answersEqual(user, ex.answer)) {
+    if (correct) {
       state.solved++;
       els.card.classList.add('correct');
       playOverlay('✓', 'ok');
@@ -401,10 +346,17 @@
         else nextExample();
       }, 850);
     } else {
-      ex.hadError = true;
+      state.current.hadError = true;
       els.card.classList.add('wrong');
       playOverlay('✗', 'bad');
-      els.feedback.textContent = 'Правильный ответ: ' + formatValue(state.widgetDef, ex.answer);
+
+      var ansText = expected != null
+        ? String(expected)
+        : (typeof state.phase.formatAnswer === 'function'
+            ? state.phase.formatAnswer(state.current)
+            : String(state.current.answer));
+
+      els.feedback.textContent = 'Правильный ответ: ' + ansText;
       els.feedback.className   = 'feedback bad';
       els.btnGotIt.hidden      = false;
       els.btnGotIt.focus();
@@ -423,7 +375,7 @@
     else showResults();
   }
 
-  /* ───────────── финал ───────────── */
+  /* ───────────── финальный экран ───────────── */
   function showResults() {
     showScreen('result');
 
@@ -451,7 +403,12 @@
       items.forEach(function (e) {
         var div = document.createElement('div');
         div.className = 'result-item ' + (e.hadError ? 'bad' : 'ok');
-        div.textContent = e.text + ' = ' + formatValue(e.widgetDef, e.answer);
+
+        var answerText = (typeof phase.formatAnswer === 'function')
+          ? phase.formatAnswer(e)
+          : String(e.answer);
+
+        div.textContent = e.text + '   ' + answerText;
 
         if (e.hadError) {
           var note = document.createElement('span');
