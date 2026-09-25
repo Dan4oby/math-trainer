@@ -25,8 +25,8 @@
     resultSummary: document.getElementById('result-summary'),
     btnStart:      document.getElementById('btn-start'),
     btnRestart:    document.getElementById('btn-restart'),
-    startSubtitle: document.getElementById('start-subtitle'),   
-    startRules:    document.getElementById('start-rules')       
+    startSubtitle: document.getElementById('start-subtitle'),
+    startRules:    document.getElementById('start-rules')
   };
 
   /* ───────────── состояние ───────────── */
@@ -47,14 +47,11 @@
   var AnswerElements = window.AnswerElements = window.AnswerElements || {};
 
   /* ───────────── рендер текста с LaTeX ───────────── */
-  /* Если строка содержит $...$ (или $$...$$, \(...\), \[...\]),
-     KaTeX через auto-render сам найдёт формулы и отрисует их,
-     а обычный текст оставит как есть. Если KaTeX не подключён —
-     строка выводится как обычный текст. */
+  /* Обычный текст выводится как есть, <br> и \n превращаются в перенос.
+     Если строка содержит $...$, KaTeX (auto-render) сам найдёт формулы. */
   function renderText(el, text) {
     text = text == null ? '' : String(text);
 
-    /* перенос строки из любой формы → реальный <br> */
     var html = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -75,21 +72,24 @@
         ],
         throwOnError: false
       });
-    } catch (e) { /* оставляем как есть */ }
+    } catch (e) { /* оставляем текст как есть */ }
   }
 
-  /* ── встроенный элемент верхней панели: строка примера ── */
+  /* ───────────── верхняя панель ───────────── */
+
+  /* строка примера; descriptor.class позволяет задать свой CSS-класс */
   TopElements['example-string'] = {
     build: function (container, descriptor, ctx) {
       var div = document.createElement('div');
       div.className = 'example' + (descriptor.class ? ' ' + descriptor.class : '');
       renderText(div, ctx.example.text);
       container.appendChild(div);
-      return null;
     }
   };
 
-  /* ── поле положительного числа ── */
+  /* ───────────── нижняя панель ───────────── */
+
+  /* поле положительного числа */
   AnswerElements.number = {
     build: function (container, descriptor, ctx) {
       var input = document.createElement('input');
@@ -119,10 +119,10 @@
     }
   };
 
-  /* ── кнопка «±» ── */
+  /* кнопка «±» — read() возвращает 1 или -1 */
   AnswerElements.sign = {
-    build: function (container, descriptor, ctx) {
-      var st = { value: 1 };
+    build: function (container) {
+      var value = 1;
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sign-toggle';
@@ -130,15 +130,15 @@
       btn.title = 'Переключить знак';
       btn.setAttribute('aria-label', 'Переключить знак');
       btn.addEventListener('click', function () {
-        st.value = -st.value;
-        btn.classList.toggle('active', st.value === -1);
+        value = -value;
+        btn.classList.toggle('active', value === -1);
       });
       container.appendChild(btn);
       return {
-        read:  function () { return st.value; },
+        read:  function () { return value; },
         lock:  function () { btn.disabled = true; },
         reset: function () {
-          st.value = 1;
+          value = 1;
           btn.disabled = false;
           btn.classList.remove('active');
         },
@@ -147,7 +147,7 @@
     }
   };
 
-  /* ── чекбокс (подпись тоже поддерживает LaTeX) ── */
+  /* чекбокс; при descriptor.group — радио-поведение внутри группы */
   AnswerElements.checkbox = {
     build: function (container, descriptor, ctx) {
       var wrap = document.createElement('label');
@@ -157,20 +157,19 @@
       var box = document.createElement('input');
       box.type = 'checkbox';
 
-      var text = document.createElement('span');
-      text.className = 'checkbox-label';
-      renderText(text, descriptor.label || '');
+      var label = document.createElement('span');
+      label.className = 'checkbox-label';
+      renderText(label, descriptor.label || '');
 
       wrap.appendChild(box);
-      wrap.appendChild(text);
+      wrap.appendChild(label);
 
-      /* radio-поведение внутри одной группы */
       if (descriptor.group) {
         box.addEventListener('change', function () {
           if (!box.checked) return;
-          var all = ctx.card.querySelectorAll(
-            '.checkbox-wrap[data-group="' + descriptor.group + '"] input[type="checkbox"]'
-          );
+          var selector = '.checkbox-wrap[data-group="' + descriptor.group +
+                         '"] input[type="checkbox"]';
+          var all = ctx.card.querySelectorAll(selector);
           Array.prototype.forEach.call(all, function (other) {
             if (other !== box) other.checked = false;
           });
@@ -196,6 +195,7 @@
     window.scrollTo(0, 0);
   }
 
+  /* По ?g=... или первый зарегистрированный генератор. */
   function selectGenerator() {
     var registry = window.ExampleGenerators || {};
     var ids = Object.keys(registry);
@@ -205,13 +205,9 @@
     return (wanted && registry[wanted]) ? registry[wanted] : registry[ids[0]];
   }
 
-  function pickGenerator() {
-    var gen = selectGenerator();
-    if (!gen) alert('Не подключено ни одного генератора примеров.');
-    return gen;
-  }
-
   /* ───────────── построение панелей ───────────── */
+
+  /* спецификация панели может быть массивом или функцией(example) → массив */
   function resolveSpec(spec, example) {
     if (typeof spec === 'function') return spec(example) || [];
     return spec || [];
@@ -249,7 +245,9 @@
     });
   }
 
-  /* ───────────── очередь и ход игры ───────────── */
+  /* ───────────── очередь ───────────── */
+
+  /* Набираем total уникальных примеров (по ключу ex.key || ex.text). */
   function buildQueue(phase) {
     var used = {}, list = [], guard = 0;
     while (list.length < phase.total && guard++ < 20000) {
@@ -261,7 +259,6 @@
       list.push(Object.assign({}, ex, {
         phaseKey:   phase.key,
         phaseTitle: phase.title || phase.label,
-        phaseRef:   phase,
         hadError:   false
       }));
     }
@@ -274,15 +271,14 @@
     els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
   }
 
+  /* ───────────── стартовый экран ───────────── */
   function renderStartScreen() {
     var gen = selectGenerator();
 
-    /* подзаголовок = имя текущего генератора */
     if (els.startSubtitle) {
       renderText(els.startSubtitle, gen && gen.name ? gen.name : '');
     }
 
-    /* список правил = то, что даёт генератор */
     if (!els.startRules) return;
     els.startRules.innerHTML = '';
 
@@ -298,35 +294,25 @@
     });
   }
 
+  /* ───────────── подсказки ───────────── */
+
+  /* hint: строка | массив строк | функция(example) → строка или массив */
   function renderHint(phase) {
     var h = phase && phase.hint;
     if (typeof h === 'function') h = h(state.current);
     if (Array.isArray(h)) {
-      if (!h.length) { els.hint.textContent = ''; return; }
-      h = h[Math.floor(Math.random() * h.length)];
+      h = h.length ? h[Math.floor(Math.random() * h.length)] : '';
     }
     renderText(els.hint, h || '');
   }
 
+  /* ───────────── ход игры ───────────── */
   function startGame() {
     var gen = selectGenerator();
     if (!gen) { alert('Генератор не подключён.'); return; }
 
-    if (gen.ready && typeof gen.ready.then === 'function') {
-      els.btnStart.disabled = true;
-      gen.ready
-        .then(function () {
-          els.btnStart.disabled = false;
-          state.generator   = gen;
-          state.allExamples = [];
-          startPhase(0);
-        })
-        .catch(function () {
-          els.btnStart.disabled = false;
-          alert('Не удалось загрузить данные генератора.');
-        });
-      return;
-    }
+    /* кнопка должна быть выключена, но на всякий случай */
+    if (gen.ready && typeof gen.ready.then === 'function' && !gen._ready) return;
 
     state.generator   = gen;
     state.allExamples = [];
@@ -396,7 +382,6 @@
     }
 
     var result = state.phase.check(bag.collected, state.current);
-
     var correct, expected;
     if (result && typeof result === 'object') {
       correct  = !!result.correct;
@@ -421,24 +406,27 @@
         if (state.queue.length === 0) finishPhase();
         else nextExample();
       }, 850);
-    } else {
-      state.current.hadError = true;
-      els.card.classList.add('wrong');
-      playOverlay('✗', 'bad');
-
-      var ansText = expected != null
-        ? String(expected)
-        : (typeof state.phase.formatAnswer === 'function'
-            ? state.phase.formatAnswer(state.current)
-            : String(state.current.answer));
-
-      renderText(els.feedback, 'Правильный ответ: ' + ansText);
-      els.feedback.className   = 'feedback bad';
-      els.btnGotIt.hidden      = false;
-      els.btnGotIt.focus();
+      return;
     }
+
+    /* неверно — показываем правильный ответ и ждём «Понял» */
+    state.current.hadError = true;
+    els.card.classList.add('wrong');
+    playOverlay('✗', 'bad');
+
+    var ansText = expected != null
+      ? String(expected)
+      : (typeof state.phase.formatAnswer === 'function'
+          ? state.phase.formatAnswer(state.current)
+          : String(state.current.answer));
+
+    renderText(els.feedback, 'Правильный ответ: ' + ansText);
+    els.feedback.className = 'feedback bad';
+    els.btnGotIt.hidden    = false;
+    els.btnGotIt.focus();
   }
 
+  /* «Понял» — пример возвращается в конец очереди */
   function onGotIt() {
     if (!state.locked || !state.current) return;
     state.queue.push(state.current);
@@ -503,7 +491,7 @@
     els.overlayIcon.textContent = symbol;
     els.overlayIcon.className   = 'overlay-icon ' + kind;
     els.overlay.classList.remove('show');
-    void els.overlay.offsetWidth;
+    void els.overlay.offsetWidth;   /* перезапуск CSS-анимации */
     els.overlay.classList.add('show');
   }
 
@@ -522,39 +510,35 @@
   els.btnCheck.addEventListener('click',   checkAnswer);
   els.btnGotIt.addEventListener('click',   onGotIt);
 
-  /* ───────────── стартовый экран ───────────── */
-  /* Заполняем подзаголовок и правила из выбранного генератора.
-     Если генератор грузится асинхронно (JSON через fetch) —
-     ждём до 3 секунд, обновляя экран каждые 100 мс. */
+  /* ───────────── инициализация стартового экрана ───────────── */
+  /* Ждём появления генератора (если он регистрируется асинхронно),
+     затем — его ready (если данные грузятся через fetch).
+     Кнопка «Начать» включается только когда всё готово. */
   (function waitForStartInfo(tries) {
     tries = tries || 0;
     var gen = selectGenerator();
 
-    /* если генератор есть, но у него незавершённый ready — ждём его */
-    var pending = gen && gen.ready && typeof gen.ready.then === 'function' && !gen._ready;
-
-    if (gen && gen.ready && !gen._ready) {
-      gen.ready.then(function () {
-        gen._ready = true;              // запоминаем, что промис разрешён
-        renderStartScreen();
-        if (els.btnStart) els.btnStart.disabled = false;
-      }).catch(function () {
-        gen._ready = true;              // помечаем, чтобы не ждать вечно
-        renderStartScreen();
-        if (els.btnStart) els.btnStart.disabled = false;
-      });
+    /* генератора пока нет — ждём до 3 секунд */
+    if (!gen) {
+      renderStartScreen();
+      if (tries < 30) setTimeout(function () { waitForStartInfo(tries + 1); }, 100);
+      return;
     }
 
+    /* генератор есть, но данные ещё грузятся — ждём ready */
+    if (gen.ready && typeof gen.ready.then === 'function' && !gen._ready) {
+      els.btnStart.disabled = true;
+      var finish = function () {
+        gen._ready = true;
+        renderStartScreen();
+        els.btnStart.disabled = false;
+      };
+      gen.ready.then(finish).catch(finish);
+      return;
+    }
+
+    /* всё готово */
     renderStartScreen();
-
-    /* кнопка активна только когда готов и генератор, и его данные */
-    if (els.btnStart) els.btnStart.disabled = !(gen && (!gen.ready || gen._ready));
-
-    /* продолжаем опрос, если либо нет генератора, либо он ещё не готов */
-    var notReady = !gen || pending;
-    if (notReady && tries < 30) {
-      setTimeout(function () { waitForStartInfo(tries + 1); }, 100);
-    }
   })();
 
 })();
