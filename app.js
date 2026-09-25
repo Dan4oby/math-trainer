@@ -24,7 +24,9 @@
     results:       document.getElementById('results'),
     resultSummary: document.getElementById('result-summary'),
     btnStart:      document.getElementById('btn-start'),
-    btnRestart:    document.getElementById('btn-restart')
+    btnRestart:    document.getElementById('btn-restart'),
+    startSubtitle: document.getElementById('start-subtitle'),   
+    startRules:    document.getElementById('start-rules')       
   };
 
   /* ───────────── состояние ───────────── */
@@ -51,10 +53,18 @@
      строка выводится как обычный текст. */
   function renderText(el, text) {
     text = text == null ? '' : String(text);
-    el.textContent = text;
+
+    /* перенос строки из любой формы → реальный <br> */
+    var html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+      .replace(/\r?\n/g, '<br>');
+
+    el.innerHTML = html;
 
     if (typeof window.renderMathInElement !== 'function') return;
-
     try {
       window.renderMathInElement(el, {
         delimiters: [
@@ -65,16 +75,14 @@
         ],
         throwOnError: false
       });
-    } catch (e) {
-      /* если что-то пошло не так — оставляем исходный текст */
-    }
+    } catch (e) { /* оставляем как есть */ }
   }
 
   /* ── встроенный элемент верхней панели: строка примера ── */
   TopElements['example-string'] = {
     build: function (container, descriptor, ctx) {
       var div = document.createElement('div');
-      div.className = 'example';
+      div.className = 'example' + (descriptor.class ? ' ' + descriptor.class : '');
       renderText(div, ctx.example.text);
       container.appendChild(div);
       return null;
@@ -188,16 +196,19 @@
     window.scrollTo(0, 0);
   }
 
-  function pickGenerator() {
+  function selectGenerator() {
     var registry = window.ExampleGenerators || {};
     var ids = Object.keys(registry);
-    if (!ids.length) {
-      alert('Не подключено ни одного генератора примеров.');
-      return null;
-    }
+    if (!ids.length) return null;
     var wanted = null;
     try { wanted = new URLSearchParams(location.search).get('g'); } catch (e) {}
     return (wanted && registry[wanted]) ? registry[wanted] : registry[ids[0]];
+  }
+
+  function pickGenerator() {
+    var gen = selectGenerator();
+    if (!gen) alert('Не подключено ни одного генератора примеров.');
+    return gen;
   }
 
   /* ───────────── построение панелей ───────────── */
@@ -263,6 +274,30 @@
     els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
   }
 
+  function renderStartScreen() {
+    var gen = selectGenerator();
+
+    /* подзаголовок = имя текущего генератора */
+    if (els.startSubtitle) {
+      renderText(els.startSubtitle, gen && gen.name ? gen.name : '');
+    }
+
+    /* список правил = то, что даёт генератор */
+    if (!els.startRules) return;
+    els.startRules.innerHTML = '';
+
+    var rules = gen && gen.rules;
+    if (typeof rules === 'function') rules = rules();
+    if (!Array.isArray(rules) || !rules.length) {
+      rules = ['🎯 Ошибочный пример вернётся к тебе позже'];
+    }
+    rules.forEach(function (r) {
+      var li = document.createElement('li');
+      renderText(li, r);
+      els.startRules.appendChild(li);
+    });
+  }
+
   function renderHint(phase) {
     var h = phase && phase.hint;
     if (typeof h === 'function') h = h(state.current);
@@ -274,8 +309,25 @@
   }
 
   function startGame() {
-    var gen = pickGenerator();
-    if (!gen) return;
+    var gen = selectGenerator();
+    if (!gen) { alert('Генератор не подключён.'); return; }
+
+    if (gen.ready && typeof gen.ready.then === 'function') {
+      els.btnStart.disabled = true;
+      gen.ready
+        .then(function () {
+          els.btnStart.disabled = false;
+          state.generator   = gen;
+          state.allExamples = [];
+          startPhase(0);
+        })
+        .catch(function () {
+          els.btnStart.disabled = false;
+          alert('Не удалось загрузить данные генератора.');
+        });
+      return;
+    }
+
     state.generator   = gen;
     state.allExamples = [];
     startPhase(0);
@@ -469,5 +521,40 @@
   els.btnRestart.addEventListener('click', startGame);
   els.btnCheck.addEventListener('click',   checkAnswer);
   els.btnGotIt.addEventListener('click',   onGotIt);
+
+  /* ───────────── стартовый экран ───────────── */
+  /* Заполняем подзаголовок и правила из выбранного генератора.
+     Если генератор грузится асинхронно (JSON через fetch) —
+     ждём до 3 секунд, обновляя экран каждые 100 мс. */
+  (function waitForStartInfo(tries) {
+    tries = tries || 0;
+    var gen = selectGenerator();
+
+    /* если генератор есть, но у него незавершённый ready — ждём его */
+    var pending = gen && gen.ready && typeof gen.ready.then === 'function' && !gen._ready;
+
+    if (gen && gen.ready && !gen._ready) {
+      gen.ready.then(function () {
+        gen._ready = true;              // запоминаем, что промис разрешён
+        renderStartScreen();
+        if (els.btnStart) els.btnStart.disabled = false;
+      }).catch(function () {
+        gen._ready = true;              // помечаем, чтобы не ждать вечно
+        renderStartScreen();
+        if (els.btnStart) els.btnStart.disabled = false;
+      });
+    }
+
+    renderStartScreen();
+
+    /* кнопка активна только когда готов и генератор, и его данные */
+    if (els.btnStart) els.btnStart.disabled = !(gen && (!gen.ready || gen._ready));
+
+    /* продолжаем опрос, если либо нет генератора, либо он ещё не готов */
+    var notReady = !gen || pending;
+    if (notReady && tries < 30) {
+      setTimeout(function () { waitForStartInfo(tries + 1); }, 100);
+    }
+  })();
 
 })();
