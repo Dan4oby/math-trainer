@@ -5,7 +5,7 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  var MIN = 2, MAX = 10;
+  var MIN = 2, MAX = 12;
 
   window.ExampleGenerators = window.ExampleGenerators || {};
 

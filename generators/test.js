@@ -27,7 +27,7 @@
 
       phases: [{
         key: 'test',
-        label: 'Тест',
+        label: data.title|| 'Тест',
         title: data.title || 'Тест',
         total: questions.length,          // сколько верных ответов нужно
         hint: data.hint || '',
