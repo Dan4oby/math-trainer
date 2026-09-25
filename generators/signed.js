@@ -11,7 +11,7 @@
     return n < 0 ? '(−' + Math.abs(n) + ')' : String(n);
   }
 
-  var MIN = 2, MAX = 12;
+  var MIN = 2, MAX = 10;
 
   window.ExampleGenerators = window.ExampleGenerators || {};
 
