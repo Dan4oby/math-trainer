@@ -86,9 +86,9 @@
 
     phases: [
 
-      /* ────────── Фаза 0: ознакомление ────────── */
+      /* ────────── Фаза 0: ознакомление с множителями ────────── */
       {
-        key:   'intro',
+        key:   'factorIntro',
         kind:  'info',
         label: 'Ознакомление',
         title: 'Разложение на множители',
@@ -111,17 +111,16 @@
               'Обычно берут множители больше $1$.'
             },
             { text:
-              'Простые множители<br>' +
-              'Если продолжать раскладывать, пока все множители не станут простыми, ' +
-              'получим разложение на простые множители. Оно единственно с точностью до порядка.<br>' +
-              'Например: $12 = 2 \\times 2 \\times 3$.'
+              'Как искать пару<br>' +
+              'Проверяй по очереди простые числа: делится ли на $2$? на $3$? на $5$?<br>' +
+              'Как только нашёл делитель, вторым множителем будет результат деления.'
             }
           ];
           var i = 0;
           return function () {
             if (i >= slides.length) return null;
             var s = slides[i++];
-            return { text: s.text, answer: null, key: 'intro-' + i };
+            return { text: s.text, answer: null, key: 'factorIntro-' + i };
           };
         })()
       },
@@ -170,7 +169,6 @@
           if (!user || user.length !== 2) {
             return { correct: false, expected: ex.answer };
           }
-          /* оба множителя должны быть больше 1 */
           if (user[0] < 2 || user[1] < 2) {
             return { correct: false, expected: ex.answer };
           }
@@ -183,13 +181,53 @@
         formatAnswer: function (ex) { return ex.answer; }
       },
 
-      /* ────────── Фаза 2: простые множители ────────── */
+      /* ────────── Фаза 2: ознакомление с простыми множителями ────────── */
+      {
+        key:   'primeIntro',
+        kind:  'info',
+        label: 'Ознакомление',
+        title: 'Разложение на простые множители',
+        total: 3,
+        hint:  '',
+
+        top: [{ type: 'example-string', class: 'question' }],
+
+        generate: (function () {
+          var slides = [
+            { text:
+              'Что такое простое число<br>' +
+              'Простое число делится только на $1$ и на само себя.<br>' +
+              'Простые числа: $2, 3, 5, 7, 11, 13, 17, 19, \\ldots$'
+            },
+            { text:
+              'Как раскладывать<br>' +
+              'Делим число на простое число, на которое оно делится, ' +
+              'записываем результат и повторяем, пока не получим только простые множители.<br>' +
+              'Например: $36 = 2 \\cdot 18 = 2 \\cdot 2 \\cdot 9 = 2 \\cdot 2 \\cdot 3 \\cdot 3$.'
+            },
+            { text:
+              'Форма записи<br>' +
+              'Множители соединяются знаком умножения.<br>' +
+              'Записываем $2 \\times 2 \\times 3$.<br>' +
+              'Порядок множителей не важен.'
+            }
+          ];
+          var i = 0;
+          return function () {
+            if (i >= slides.length) return null;
+            var s = slides[i++];
+            return { text: s.text, answer: null, key: 'primeIntro-' + i };
+          };
+        })()
+      },
+
+      /* ────────── Фаза 3: простые множители ────────── */
       {
         key:   'primeFactorization',
         label: 'Простые множители',
         title: 'Разложение на простые множители',
         total: PRIMES_TOTAL,
-        intro: 'Теперь — на простые множители!',
+        intro: 'Переходим к заданиям!',
 
         hint: [
           'Начни с самого маленького простого числа — $2$.',
@@ -228,14 +266,12 @@
             return { correct: false, expected: ex.answer };
           }
 
-          /* каждый введённый множитель должен быть простым */
           for (var i = 0; i < user.length; i++) {
             if (!isPrime(user[i])) {
               return { correct: false, expected: ex.answer };
             }
           }
 
-          /* произведение должно совпасть с исходным числом */
           var prod = 1;
           for (var j = 0; j < user.length; j++) prod *= user[j];
 
