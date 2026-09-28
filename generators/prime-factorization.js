@@ -1,8 +1,9 @@
 (function () {
   'use strict';
 
-  var TOTAL     = 12;      // сколько верных ответов нужно на фазу
-  var MAX_VALUE = 100;    // потолок для разлагаемого числа
+  var MAX_VALUE    = 200;   // потолок для разлагаемых чисел
+  var PAIRS_TOTAL  = 12;    // верных ответов на фазе «пара множителей»
+  var PRIMES_TOTAL = 9;     // верных ответов на фазе «простые множители»
 
   /* ─────────── утилиты ─────────── */
 
@@ -20,7 +21,7 @@
     return true;
   }
 
-  /* Разложение числа на простые множители (по возрастанию). */
+  /* Все простые множители числа (по возрастанию). */
   function factorize(n) {
     var result = [];
     var d = 2;
@@ -35,27 +36,23 @@
     return result;
   }
 
-  /* ─────────── сборка задания ─────────── */
+  /* Минимальная нетривиальная пара множителей: [d, n/d], где d — самое
+     маленькое число ≥ 2, делящее n. Для составных чисел всегда находится. */
+  function smallestFactorPair(n) {
+    for (var d = 2; d * d <= n; d++) {
+      if (n % d === 0) return [d, n / d];
+    }
+    return null;
+  }
 
-  /* Берём случайное число от 4 до MAX_VALUE, отбрасываем простые —
-     остаются только составные. Эталон — разложение на простые. */
-  function makeTask() {
+  /* Случайное составное число из [4, MAX_VALUE]. */
+  function randomComposite() {
     var n;
     do {
       n = randInt(4, MAX_VALUE);
     } while (isPrime(n));
-
-    var factors = factorize(n);
-
-    return {
-      text:   'Разложи число на простые множители:<br>$' + n + '$',
-      number: n,
-      answer: factors.join('×'),
-      key:    'p:' + n
-    };
+    return n;
   }
-
-  /* ─────────── разбор ответа ─────────── */
 
   /* Принимает строку вида «2×2×3», «2*2*3», «2 · 2 · 3»,
      возвращает массив целых чисел или null, если формат неверен. */
@@ -73,28 +70,28 @@
     return out.length ? out : null;
   }
 
-  /* ─────────── регистрация генератора ─────────── */
+  /* ─────────── регистрация ─────────── */
 
   window.ExampleGenerators = window.ExampleGenerators || {};
 
   window.ExampleGenerators.primeFactorization = {
     id:   'primeFactorization',
-    name: 'Разложение на простые множители',
+    name: 'Разложение на множители',
 
     rules: [
-      '✍️ Запиши число в виде произведения простых множителей',
-      '🔢 Каждый множитель — простое число: 2, 3, 5, 7, 11, …',
+      '✍️ Сначала разложи число на любые два множителя',
+      '🔢 Затем — на простые множители',
       '🎯 Ошибочный пример вернётся к тебе позже'
     ],
 
     phases: [
 
-      /* ── Фаза 0: ознакомление ── */
+      /* ────────── Фаза 0: ознакомление ────────── */
       {
         key:   'intro',
         kind:  'info',
         label: 'Ознакомление',
-        title: 'Разложение на простые множители',
+        title: 'Разложение на множители',
         total: 3,
         hint:  '',
 
@@ -103,21 +100,21 @@
         generate: (function () {
           var slides = [
             { text:
-              'Что такое простое число<br>' +
-              'Простое число делится только на $1$ и на само себя.<br>' +
-              'Простые числа: $2, 3, 5, 7, 11, 13, 17, 19, \\ldots$'
+              'Что такое множители<br>' +
+              'Множители — это числа, которые при перемножении дают исходное число.<br>' +
+              'Например: $12 = 3 \\times 4$, значит $3$ и $4$ — множители числа $12$.'
             },
             { text:
-              'Как раскладывать<br>' +
-              'Делим число на простое число, на которое оно делится, ' +
-              'записываем результат и повторяем, пока не получим только простые множители.<br>' +
-              'Например: $36 = 2 \\cdot 18 = 2 \\cdot 2 \\cdot 9 = 2 \\cdot 2 \\cdot 3 \\cdot 3$.'
+              'Разные пары<br>' +
+              'Одно и то же число можно разложить по-разному.<br>' +
+              '$12 = 2 \\times 6 = 3 \\times 4$.<br>' +
+              'Обычно берут множители больше $1$.'
             },
             { text:
-              'Форма записи<br>' +
-              'Множители соединяются знаком умножения.<br>' +
-              'Записываем $2 \\times 2 \\times 3$.<br>' +
-              'Порядок множителей не важен.'
+              'Простые множители<br>' +
+              'Если продолжать раскладывать, пока все множители не станут простыми, ' +
+              'получим разложение на простые множители. Оно единственно с точностью до порядка.<br>' +
+              'Например: $12 = 2 \\times 2 \\times 3$.'
             }
           ];
           var i = 0;
@@ -129,13 +126,70 @@
         })()
       },
 
-      /* ── Фаза 1: задания ── */
+      /* ────────── Фаза 1: любая пара множителей ────────── */
       {
-        key:   'factorization',
-        label: 'Разложение',
-        title: 'Разложение на простые множители',
-        total: TOTAL,
+        key:   'factorPairs',
+        label: 'Пара множителей',
+        title: 'Разложение на два множителя',
+        total: PAIRS_TOTAL,
         intro: 'Переходим к заданиям!',
+
+        hint: [
+          'Попробуй разные пары: сначала раздели на $2$, если не подходит — на $3$, потом на $5$.',
+          'Множители должны быть больше $1$.',
+          'Проверь себя: перемножь свои множители — должно получиться исходное число.'
+        ],
+
+        top: [{ type: 'example-string', class: 'question' }],
+
+        bottom: [
+          [{ type: 'text', id: 'expr', placeholder: '3×4' }],
+          [
+            { type: 'insert', target: 'expr', value: '×', label: '×' }
+          ]
+        ],
+
+        generate: (function () {
+          var i = 0;
+          return function () {
+            if (i++ >= PAIRS_TOTAL) return null;
+            var n = randomComposite();
+            var pair = smallestFactorPair(n);
+
+            return {
+              text:   'Разложи число на два множителя:<br>$' + n + '$',
+              number: n,
+              answer: pair[0] + '×' + pair[1],
+              key:    'pair:' + n
+            };
+          };
+        })(),
+
+        check: function (collected, ex) {
+          var user = parseFactors(collected.expr);
+          if (!user || user.length !== 2) {
+            return { correct: false, expected: ex.answer };
+          }
+          /* оба множителя должны быть больше 1 */
+          if (user[0] < 2 || user[1] < 2) {
+            return { correct: false, expected: ex.answer };
+          }
+          return {
+            correct:  user[0] * user[1] === ex.number,
+            expected: ex.answer
+          };
+        },
+
+        formatAnswer: function (ex) { return ex.answer; }
+      },
+
+      /* ────────── Фаза 2: простые множители ────────── */
+      {
+        key:   'primeFactorization',
+        label: 'Простые множители',
+        title: 'Разложение на простые множители',
+        total: PRIMES_TOTAL,
+        intro: 'Теперь — на простые множители!',
 
         hint: [
           'Начни с самого маленького простого числа — $2$.',
@@ -155,8 +209,16 @@
         generate: (function () {
           var i = 0;
           return function () {
-            if (i++ >= TOTAL) return null;
-            return makeTask();
+            if (i++ >= PRIMES_TOTAL) return null;
+            var n = randomComposite();
+            var factors = factorize(n);
+
+            return {
+              text:   'Разложи число на простые множители:<br>$' + n + '$',
+              number: n,
+              answer: factors.join('×'),
+              key:    'prime:' + n
+            };
           };
         })(),
 
@@ -166,7 +228,7 @@
             return { correct: false, expected: ex.answer };
           }
 
-          /* все введённые числа должны быть простыми */
+          /* каждый введённый множитель должен быть простым */
           for (var i = 0; i < user.length; i++) {
             if (!isPrime(user[i])) {
               return { correct: false, expected: ex.answer };
