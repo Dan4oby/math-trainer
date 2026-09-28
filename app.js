@@ -39,6 +39,7 @@
     solved:      0,
     allExamples: [],
     locked:      false,
+    isInfo:      false,
     widgets:     []
   };
 
@@ -187,6 +188,79 @@
     }
   };
 
+  AnswerElements.text = {
+  build: function (container, descriptor, ctx) {
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.className = 'answer-input text-input';
+    input.placeholder = descriptor.placeholder || '?';
+
+    var sel = { start: 0, end: 0 };
+
+    /* запоминаем позицию курсора — пригодится, когда кнопка заберёт фокус */
+    function remember() {
+      sel.start = input.selectionStart || 0;
+      sel.end   = input.selectionEnd   || 0;
+    }
+    ['keyup', 'mouseup', 'select', 'input', 'click'].forEach(function (ev) {
+      input.addEventListener(ev, remember);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); ctx.submit(); }
+    });
+
+    container.appendChild(input);
+
+    return {
+      read:  function () {
+        var v = input.value.trim();
+        return v === '' ? null : v;
+      },
+      lock:  function () { input.disabled = true; },
+      reset: function () {
+        input.value = '';
+        input.disabled = false;
+        sel = { start: 0, end: 0 };
+      },
+      focus: function () { input.focus(); },
+      insertAtCursor: function (text) {
+        var start = (document.activeElement === input) ? input.selectionStart : sel.start;
+        var end   = (document.activeElement === input) ? input.selectionEnd   : sel.end;
+        var v = input.value;
+        input.value = v.slice(0, start) + text + v.slice(end);
+        var pos = start + text.length;
+        input.setSelectionRange(pos, pos);
+        remember();
+      }
+    };
+  }
+};
+
+AnswerElements.insert = {
+  build: function (container, descriptor, ctx) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'insert-btn';
+    btn.textContent = descriptor.label || descriptor.value || '';
+    if (descriptor.title) btn.title = descriptor.title;
+
+    /* не даём кнопке украсть фокус у поля ввода — курсор не сбросится */
+    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+
+    btn.addEventListener('click', function () {
+      var target = findWidgetById(descriptor.target);
+      if (!target || typeof target.insertAtCursor !== 'function') return;
+      target.insertAtCursor(descriptor.value != null ? descriptor.value : '');
+    });
+
+    container.appendChild(btn);
+    return null;   /* кнопка не участвует в сборе ответа */
+  }
+};
+
   /* ───────────── утилиты ───────────── */
   function showScreen(name) {
     Object.keys(els.screens).forEach(function (k) {
@@ -203,6 +277,13 @@
     var wanted = null;
     try { wanted = new URLSearchParams(location.search).get('g'); } catch (e) {}
     return (wanted && registry[wanted]) ? registry[wanted] : registry[ids[0]];
+  }
+
+  function findWidgetById(id) {
+    for (var i = 0; i < state.widgets.length; i++) {
+      if (state.widgets[i].id === id) return state.widgets[i].handle;
+    }
+    return null;
   }
 
   /* ───────────── построение панелей ───────────── */
@@ -266,9 +347,20 @@
   }
 
   function updateHeader() {
-    els.phaseLabel.textContent    = state.phase.label;
-    els.progressLabel.textContent = 'Решено: ' + state.solved + ' / ' + state.phase.total;
-    els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
+    els.phaseLabel.textContent = state.phase.label;
+
+    if (state.isInfo) {
+      var current = Math.min(state.solved + 1, state.phase.total);
+      els.progressLabel.textContent = 'Слайд ' + current + ' / ' + state.phase.total;
+    } else {
+      els.progressLabel.textContent = 'Решено: ' + state.solved + ' / ' + state.phase.total;
+    }
+
+    els.progressFill.style.width = (state.solved / state.phase.total * 100) + '%';
+  }
+
+  function updateCheckButton() {
+    els.btnCheck.textContent = state.isInfo ? 'Дальше' : 'Проверить';
   }
 
   /* ───────────── стартовый экран ───────────── */
@@ -324,11 +416,13 @@
     state.phase      = state.generator.phases[index];
     state.solved     = 0;
     state.locked     = false;
+    state.isInfo     = state.phase.kind === 'info';
 
     state.queue       = buildQueue(state.phase);
     state.allExamples = state.allExamples.concat(state.queue);
 
     updateHeader();
+    updateCheckButton();
     showScreen('task');
 
     if (state.phase.intro && index > 0) showBanner(state.phase.intro, nextExample);
@@ -342,7 +436,13 @@
     state.locked  = false;
 
     buildTopPanel(state.phase, state.current);
-    buildBottomPanel(state.phase, state.current);
+
+    if (state.isInfo) {
+      els.bottomPanel.innerHTML = '';
+      state.widgets = [];
+    } else {
+      buildBottomPanel(state.phase, state.current);
+    }
 
     els.feedback.textContent = '';
     els.feedback.className   = 'feedback';
@@ -352,7 +452,7 @@
 
     renderHint(state.phase);
 
-    if (state.widgets.length && state.widgets[0].handle.focus) {
+    if (!state.isInfo && state.widgets.length && state.widgets[0].handle.focus) {
       state.widgets[0].handle.focus();
     }
   }
@@ -370,6 +470,16 @@
 
   function checkAnswer() {
     if (state.locked || !state.current) return;
+
+    /* ознакомительный слайд: кнопка работает как «Дальше» */
+    if (state.isInfo) {
+      state.solved++;
+      updateHeader();
+      if (state.queue.length === 0) finishPhase();
+      else nextExample();
+      return;
+    }
+
     if (typeof state.phase.check !== 'function') {
       console.warn('Фаза «' + state.phase.key + '» не задаёт функцию check.');
       return;
@@ -454,6 +564,7 @@
     els.results.innerHTML = '';
 
     state.generator.phases.forEach(function (phase) {
+      if (phase.kind === 'info') return;
       var items = state.allExamples.filter(function (e) { return e.phaseKey === phase.key; });
       if (!items.length) return;
 

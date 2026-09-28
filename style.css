@@ -437,3 +437,28 @@ h1 { font-size: clamp(26px, 6vw, 38px); margin: 0 0 10px; }
     justify-content: flex-start;
   }
 }
+
+.insert-btn {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2px solid #cbd5e1;
+  background: #f8fafc;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.insert-btn:hover { border-color: #94a3b8; background: #eef2ff; }
+.insert-btn:active { transform: scale(.94); }
+
+.text-input {
+  width: auto;
+  min-width: 220px;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}

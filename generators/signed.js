@@ -11,7 +11,7 @@
     return n < 0 ? '(−' + Math.abs(n) + ')' : String(n);
   }
 
-  var MIN = 2, MAX = 10;
+  var MIN = 2, MAX = 12;
 
   window.ExampleGenerators = window.ExampleGenerators || {};
 
@@ -33,7 +33,7 @@
         key: 'signed-multiplication',
         label: 'Умножение ±',
         title: 'Умножение (с отрицательными числами)',
-        total: 12,
+        total: 7,
 
         hint: [
           'Сначала посчитай умножение без знака, потом определи знак.',
@@ -90,7 +90,7 @@
         key: 'signed-division',
         label: 'Деление ±',
         title: 'Деление (с отрицательными числами)',
-        total: 12,
+        total: 8,
         intro: 'Умножение со знаками пройдено! 🎉<br>Переходим к делению',
 
         hint: [
