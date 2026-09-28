@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var MAX_VALUE    = 81;   // потолок для разлагаемых чисел
+  var MAX_VALUE    = 100;   // потолок для разлагаемых чисел
   var PAIRS_TOTAL  = 14;    // верных ответов на фазе «пара множителей»
   var PRIMES_TOTAL = 8;     // верных ответов на фазе «простые множители»
 
@@ -46,10 +46,10 @@
   }
 
   /* Случайное составное число из [4, MAX_VALUE]. */
-  function randomComposite() {
+  function randomComposite(max) {
     var n;
     do {
-      n = randInt(4, MAX_VALUE);
+      n = randInt(4, max);
     } while (isPrime(n));
     return n;
   }
@@ -152,7 +152,7 @@
           var i = 0;
           return function () {
             if (i++ >= PAIRS_TOTAL) return null;
-            var n = randomComposite();
+            var n = randomComposite(Math.trunc(MAX_VALUE / 2));
             var pair = smallestFactorPair(n);
 
             return {
@@ -248,7 +248,7 @@
           var i = 0;
           return function () {
             if (i++ >= PRIMES_TOTAL) return null;
-            var n = randomComposite();
+            var n = randomComposite(MAX_VALUE);
             var factors = factorize(n);
 
             return {
