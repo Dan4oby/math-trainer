@@ -4,7 +4,27 @@
   function randInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
+
+  /* Генерация с перекосом в сторону больших чисел (сложнее) */
+  function randIntHard(min, max) {
+    var r = Math.pow(Math.random(), 0.6); // ближе к 1 → числа ближе к max
+    return Math.floor(r * (max - min + 1)) + min;
+  }
+
   function pick(arr) { return arr[randInt(0, arr.length - 1)]; }
+
+  /* Выбор с весами: items = [[значение, вес], ...] */
+  function pickWeighted(items) {
+    var total = 0;
+    for (var i = 0; i < items.length; i++) total += items[i][1];
+
+    var r = Math.random() * total;
+    for (var j = 0; j < items.length; j++) {
+      r -= items[j][1];
+      if (r < 0) return items[j][0];
+    }
+    return items[items.length - 1][0];
+  }
 
   /* отрицательные числа печатаем в скобках, как в учебнике */
   function signChar(n) {
@@ -41,10 +61,8 @@
           'Считай как обычно, а знак поставь в конце.'
         ],
 
-        /* верхняя панель: строка примера */
         top: [{ type: 'example-string' }],
 
-        /* нижняя панель: одна строка — [±] [число] */
         bottom: [
           [
             { type: 'sign',   id: 'sign' },
@@ -53,12 +71,24 @@
         ],
 
         generate: function () {
-          var a = randInt(MIN, MAX);
-          var b = randInt(MIN, MAX);
+          /* чаще берём большие множители */
+          var a = randIntHard(MIN, MAX);
+          var b = randIntHard(MIN, MAX);
 
-          var variant = pick(['pos-pos', 'mixed', 'neg-neg']);
-          if (variant === 'mixed')        { if (Math.random() < 0.5) a = -a; else b = -b; }
-          else if (variant === 'neg-neg') { a = -a; b = -b; }
+          /* pos-pos реже, mixed и neg-neg — чаще */
+          var variant = pickWeighted([
+            ['pos-pos', 1],
+            ['mixed',   3],
+            ['neg-neg', 1]
+          ]);
+
+          if (variant === 'mixed') {
+            if (Math.random() < 0.5) a = -a;
+            else b = -b;
+          } else if (variant === 'neg-neg') {
+            a = -a;
+            b = -b;
+          }
 
           return {
             text:   '$' + signChar(a) + ' * ' + signChar(b) + '$',
@@ -67,7 +97,6 @@
           };
         },
 
-        /* проверка ответа: собираем знак и модуль и сравниваем с answer */
         check: function (collected, ex) {
           if (collected.mag === null) {
             return { correct: false, expected: formatSigned(ex.answer) };
@@ -89,7 +118,7 @@
         key: 'signed-division',
         label: 'Деление ±',
         title: 'Деление (с отрицательными числами)',
-        total: 8,
+        total: 9,
         intro: 'Умножение со знаками пройдено! 🎉<br>Переходим к делению',
 
         hint: [
@@ -108,13 +137,25 @@
         ],
 
         generate: function () {
-          var b = randInt(MIN, MAX);
-          var q = randInt(MIN, MAX);
+          /* делитель и частное чаще ближе к 13 */
+          var b = randIntHard(MIN, MAX);
+          var q = randIntHard(MIN, MAX);
           var a = b * q;
 
-          var variant = pick(['pos-pos', 'mixed', 'neg-neg']);
-          if (variant === 'mixed')        { if (Math.random() < 0.5) a = -a; else b = -b; }
-          else if (variant === 'neg-neg') { a = -a; b = -b; }
+          /* pos-pos реже, mixed и neg-neg — чаще */
+          var variant = pickWeighted([
+            ['pos-pos', 1],
+            ['mixed',   3],
+            ['neg-neg', 1]
+          ]);
+
+          if (variant === 'mixed') {
+            if (Math.random() < 0.5) a = -a;
+            else b = -b;
+          } else if (variant === 'neg-neg') {
+            a = -a;
+            b = -b;
+          }
 
           /* частное целое, его знак = знак(a) XOR знак(b) */
           var answer = (a < 0) === (b < 0) ? q : -q;
