@@ -35,7 +35,7 @@
      однозначен (можно вынести 3 или -3). */
   function makeTask() {
     var k = randInt(K_MIN, K_MAX);
-    var n = randInt(2, 4);
+    var n = randInt(2, 3);
 
     var coefs;
     do {
