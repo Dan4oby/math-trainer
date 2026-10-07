@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var TOTAL = 10;   // верных ответов на фазу заданий
+  var TOTAL = 6;   // верных ответов на фазу заданий
 
   /* ─────────── утилиты ─────────── */
 
@@ -42,11 +42,11 @@
      тоже положительный, остальные — со случайными знаками. Ответ —
      поэлементные произведения, в том же порядке, без приведения. */
   function makeTask() {
-    var k = randInt(2, 9);
+    var k = randInt(2, 5);
     var n = randInt(2, 4);
 
     var coeffs = [];
-    for (var i = 0; i < n; i++) coeffs.push(randInt(2, 9));
+    for (var i = 0; i < n; i++) coeffs.push(randInt(2, 5));
 
     var signs = [1];
     for (var j = 1; j < n; j++) {
