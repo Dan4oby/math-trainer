@@ -60,11 +60,10 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      /* разрешённые теги возвращаем обратно */
       .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
       .replace(/&lt;(\/?)(b|strong)&gt;/gi, '<$1$2>')
       .replace(/&lt;(\/?)(i|em)&gt;/gi, '<$1$2>')
-      /* перевод строки → <br> */
+      .replace(/&lt;(\/?)(ol|ul|li)&gt;/gi, '<$1$2>')   // ← NEW
       .replace(/\r?\n/g, '<br>');
 
     el.innerHTML = html;
@@ -797,8 +796,8 @@ AnswerElements.insert = {
     els.banner.classList.add('show');
     setTimeout(function () {
       els.banner.classList.remove('show');
-      setTimeout(cb, 100);
-    }, 600);
+      setTimeout(cb, 50);
+    }, 300);
   }
 
   /* ───────────── события ───────────── */

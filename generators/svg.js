@@ -291,15 +291,43 @@
     }) + '>' + children + '</svg>';
   }
 
+  /* Иллюстрация «перемещение по числовой прямой»: от точки x1 к точке x2.
+   opts: {
+     from, to,           // координаты на прямой
+     labelFrom, labelTo, // подписи под точками (необязательно)
+     arrow,              // подпись над стрелкой (необязательно)
+     range: [min, max],  // диапазон прямой (по умолчанию -4..5)
+     width, height, unit // размеры холста (по умолчанию 500/160/40)
+   } */
+  function numberLineMove(opts) {
+    opts = opts || {};
+    var range = opts.range || [-4, 5];
+    var width  = opts.width  || 500;
+    var height = opts.height || 160;
+    var unit   = opts.unit   || 40;
+    return canvas({
+      width: width, height: height, unit: unit,
+      originY: height - 60,
+      children: [
+        numberLine({ from: range[0], to: range[1], arrow: 'right', labelSize: 14 }),
+        point(opts.from, 0, { color: '#2563eb', label: opts.labelFrom, labelSide: 'top' }),
+        point(opts.to,   0, { color: '#16a34a', label: opts.labelTo,   labelSide: 'top' }),
+        vector(opts.from, 0, opts.to, 0, {
+          color: '#ef4444', label: opts.arrow, labelDy: -28
+        })
+      ]
+    });
+  }
   /* ─────────── экспорт ─────────── */
 
   window.Svg = {
-    canvas:     canvas,
-    numberLine: numberLine,
-    point:      point,
-    vector:     vector,
-    line:       line,
-    label:      label
+    canvas:         canvas,
+    numberLine:     numberLine,
+    point:          point,
+    vector:         vector,
+    line:           line,
+    label:          label,
+    numberLineMove: numberLineMove
   };
 
 })();

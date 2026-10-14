@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  /* ─────────── Реестр генераторов ─────────── */
+  /* ─────────── регистрация генераторов ─────────── */
 
   function register(id, def) {
     window.ExampleGenerators = window.ExampleGenerators || {};
@@ -9,7 +9,7 @@
     return def;
   }
 
-  /* ─────────── Случайные числа и выбор ─────────── */
+  /* ─────────── случайные числа ─────────── */
 
   function randInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -38,7 +38,7 @@
     return items[items.length - 1][0];
   }
 
-  /* ─────────── Теория чисел ─────────── */
+  /* ─────────── теория чисел ─────────── */
 
   function gcd(a, b) {
     a = Math.abs(a); b = Math.abs(b);
@@ -91,7 +91,7 @@
     return n;
   }
 
-  /* ─────────── Форматирование ─────────── */
+  /* ─────────── форматирование ─────────── */
 
   function signChar(n) {
     return n < 0 ? '(−' + Math.abs(n) + ')' : String(n);
@@ -101,13 +101,8 @@
     return n < 0 ? '−' + Math.abs(n) : String(n);
   }
 
-  /* ─────────── Нормализация и разбор ответа ─────────── */
+  /* ─────────── разбор ответа ─────────── */
 
-  /* Приводит разные минусы к «-», убирает пробелы.
-     Опции:
-       dropMultiplication — если true, знаки × · * удаляются (для ответов
-                            вида «3(2+3)», где «3*(2+3)» эквивалентно «3(2+3)»).
-                            По умолчанию false — знаки умножения сохраняются. */
   function normalize(s, options) {
     options = options || {};
     var out = String(s)
@@ -155,19 +150,20 @@
     return out;
   }
 
-  /* ─────────── Помощники для фаз ─────────── */
+  /* ─────────── помощники для generate ─────────── */
 
-  /* generate, который выдаёт ровно total задач, затем null. */
-  function sequential(total, producer) {
+  /* Идёт по массиву строго по порядку, пока элементы не кончатся.
+     mapper(item, index) превращает элемент в объект примера. */
+  function fromArray(items, mapper) {
     var i = 0;
     return function () {
-      if (i >= total) return null;
-      return producer(i++);
+      if (i >= items.length) return null;
+      return mapper(items[i], i++);
     };
   }
 
-  /* generate для слайдов ознакомления.
-     items — массив { title, text }. Каждый слайд оборачивается в example. */
+  /* Слайды ознакомления. Принимает массив объектов { title, text, svg?, ... }
+     и пропускает через себя все поля слайда, кроме служебных. */
   function slides(items) {
     var i = 0;
     return function () {
@@ -175,11 +171,15 @@
       var s = items[i++];
       var out = { answer: null, key: 'slide-' + i };
       for (var k in s) {
-        if (s.hasOwnProperty(k)) out[k] = s[k];
+        if (Object.prototype.hasOwnProperty.call(s, k)) out[k] = s[k];
       }
       return out;
     };
   }
+
+  function answerAsIs(ex) { return ex.answer; }
+
+  /* ─────────── single choice ─────────── */
 
   function checkSingleChoice(collected, ex) {
     var chosen = null;
@@ -219,9 +219,62 @@
     return ex.options[ex.correct];
   }
 
-  function answerAsIs(ex) { return ex.answer; }
+  /* ─────────── фабрики фаз ─────────── */
 
-  /* ─────────── Экспорт ─────────── */
+  /* Фаза-вопрос с одним правильным вариантом ответа.
+     opts: {
+       key, title,
+       generate       — функция, возвращающая объект вопроса, ИЛИ
+       question       — готовый объект { text, options, correct, key? },
+       label?, hint?, total?, progress?
+     } */
+  function singleChoicePhase(opts) {
+    var generate = opts.generate;
+    if (!generate) {
+      var fixed = opts.question;
+      generate = function () { return fixed; };
+    }
+    return {
+      key:          opts.key,
+      label:        opts.label || 'Вопрос',
+      title:        opts.title,
+      intro:        opts.intro,
+      total:        opts.total != null ? opts.total : 1,
+      progress:     opts.progress || 'group',
+      hint:         opts.hint,
+      top:          [{ type: 'example-string', class: 'question' }],
+      bottom:       singleChoicePanel,
+      generate:     generate,
+      check:        checkSingleChoice,
+      formatAnswer: formatSingleChoice
+    };
+  }
+
+  /* Фаза ознакомления со слайдами.
+     opts: { key, slides, label?, title?, progress? }
+     Каждый слайд — { title, text, svg? } */
+  function infoPhase(opts) {
+    return {
+      key:      opts.key,
+      kind:     'info',
+      label:    opts.label || 'Ознакомление',
+      title:    opts.title || opts.label || 'Ознакомление',
+      intro:    opts.intro,
+      total:    opts.slides.length,
+      progress: opts.progress || 'group',
+      top:      [{ type: 'info-slide' }],
+      generate: slides(opts.slides)
+    };
+  }
+
+  /* То же, но с SVG-картинкой под текстом слайда. */
+  function svgInfoPhase(opts) {
+    var p = infoPhase(opts);
+    p.top = [{ type: 'info-slide' }, { type: 'svg' }];
+    return p;
+  }
+
+  /* ─────────── экспорт ─────────── */
 
   window.GeneratorLib = {
     register:           register,
@@ -245,13 +298,17 @@
     parseFactors:       parseFactors,
     parseSignedTerms:   parseSignedTerms,
 
-    sequential:         sequential,
+    fromArray:          fromArray,
     slides:             slides,
     answerAsIs:         answerAsIs,
 
     checkSingleChoice:  checkSingleChoice,
     singleChoicePanel:  singleChoicePanel,
-    formatSingleChoice: formatSingleChoice
+    formatSingleChoice: formatSingleChoice,
+
+    singleChoicePhase:  singleChoicePhase,
+    infoPhase:          infoPhase,
+    svgInfoPhase:       svgInfoPhase
   };
 
 })();

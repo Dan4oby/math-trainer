@@ -35,8 +35,8 @@
 
   --formula-bg:     #fefffa;
   --formula-border: #d4d3cf;
-  --formula-shadow: 0 2px 4px rgba(180, 130, 20, 0.12),
-                    0 4px 12px rgba(180, 130, 20, 0.06);
+  --formula-shadow: 0 4px 6px rgba(180, 127, 13, 0.18),
+                    0 6px 16px rgba(180, 130, 20, 0.07);
 }
 
 /* Строгая тема — спокойный серо-голубой градиент */
@@ -315,25 +315,31 @@ h1 {
 .info-body i,
 .info-body em     { font-style: italic; }
 .info-body .katex { font-size: 1.15em; }
+
 .katex {
+  display: inline-block;            /* ключевое — включает вертикальные margin/padding */
   background: var(--formula-bg);
-  border-radius: 8px;
-  padding: 2px 6px;
+  border-radius: 10px;
+  padding: 4px 10px;
+  margin: 4px 2px;                  /* 4px сверху-снизу, 2px по бокам */
   box-shadow: var(--formula-shadow);
   transition: background .5s ease, box-shadow .5s ease;
 }
 
-/* Display-формулы ($$…$$) — отдельным блоком */
+/* Display-формулы ($$…$$) — как было, но сбрасываем inline-block
+   у внутреннего .katex, чтобы не было двойной рамки */
 .katex-display {
   background: var(--formula-bg);
-  border-radius: 10px;
-  padding: 10px 16px;
-  margin: 14px 0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin: 16px 0;
   box-shadow: var(--formula-shadow);
 }
 .katex-display > .katex {
+  display: inline;                  /* отменяем inline-block */
   background: transparent;
   padding: 0;
+  margin: 0;
   box-shadow: none;
 }
 
@@ -570,35 +576,52 @@ h1 {
    Финальный экран
    ═══════════════════════════════════════════════════════════ */
 
+/* шапка финального экрана — компактнее, чем обычные заголовки */
+#screen-result h1 {
+  font-size: clamp(22px, 5vw, 30px);
+  margin: 0 0 6px;
+}
+#screen-result .subtitle {
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+#screen-result { margin-top: 0; }
+
 .result-card {
   background: #fff;
   border-radius: var(--radius-lg);
-  padding: 34px 26px 30px;
+  padding: 24px 20px 20px;
   box-shadow: var(--shadow-card);
 }
+
 .results {
-  margin: 22px 0 28px;
-  max-height: 52vh;
+  margin: 12px 0 14px;
+  max-height: 68vh;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 2px;
 }
+.results::-webkit-scrollbar       { width: 6px; }
+.results::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
 .results h2 {
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 1.4px;
   text-transform: uppercase;
   color: #94a3b8;
-  margin: 18px 0 10px;
+  margin: 14px 0 8px;
 }
 .results h2:first-child { margin-top: 0; }
+
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
 }
+
 .result-item {
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   border: 2px solid var(--soft-2);
@@ -610,20 +633,27 @@ h1 {
 .result-item.bad { border-color: #cbd5e1;            background: #f1f5f9; }
 
 .result-question {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
-.result-answers {
-  font-size: 17px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.result-correct { color: var(--green); }
-.result-user    { color: #94a3b8; margin-left: 6px; font-weight: 600; }
 
+.result-answers {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.result-correct { color: var(--green); }
+.result-user    { color: #94a3b8; margin-left: 5px; font-weight: 600; }
+
+#btn-restart {
+  padding: 11px 22px;
+  font-size: 17px;
+}
 .center { text-align: center; }
 
 .bottom-row:has(.checkbox-wrap) {
@@ -637,6 +667,54 @@ h1 {
 .bottom-row:has(.checkbox-wrap) .checkbox-wrap {
   width: 100%;
   justify-content: flex-start;
+}
+#screen-result h1 {
+  font-size: clamp(22px, 5vw, 30px);
+  margin: 0 0 6px;
+}
+#screen-result .subtitle {
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+
+#screen-result {
+  margin-top: 0;
+}
+
+.info-body ol {
+  counter-reset: info-list;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-body ol > li {
+  counter-increment: info-list;
+  padding-left: 34px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.info-body ol > li::before,
+.info-body ul > li::before {
+  content: counter(info-list);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);     /* ← вот это */
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 /* ═══════════════════════════════════════════════════════════
    Медиа-запросы
