@@ -11,6 +11,7 @@
     phaseLabel:    document.getElementById('phase-label'),
     progressLabel: document.getElementById('progress-label'),
     progressFill:  document.getElementById('progress-fill'),
+    progressBar:   document.querySelector('.progressbar'),
     card:          document.getElementById('task-card'),
     topPanel:      document.getElementById('top-panel'),
     bottomPanel:   document.getElementById('bottom-panel'),
@@ -40,7 +41,9 @@
     allExamples: [],
     locked:      false,
     isInfo:      false,
-    widgets:     []
+    widgets:     [],
+    groupIndex: 0,   // ← NEW: номер текущей фазы внутри группы
+    groupTotal: 0    // ← NEW: сколько всего фаз в группе
   };
 
   /* ───────────── реестры элементов ───────────── */
@@ -57,7 +60,11 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
+      /* разрешённые теги возвращаем обратно */
       .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+      .replace(/&lt;(\/?)(b|strong)&gt;/gi, '<$1$2>')
+      .replace(/&lt;(\/?)(i|em)&gt;/gi, '<$1$2>')
+      /* перевод строки → <br> */
       .replace(/\r?\n/g, '<br>');
 
     el.innerHTML = html;
@@ -73,7 +80,7 @@
         ],
         throwOnError: false
       });
-    } catch (e) { /* оставляем текст как есть */ }
+    } catch (e) { /* оставляем как есть */ }
   }
 
   /* ───────────── верхняя панель ───────────── */
@@ -85,6 +92,39 @@
       div.className = 'example' + (descriptor.class ? ' ' + descriptor.class : '');
       renderText(div, ctx.example.text);
       container.appendChild(div);
+    }
+  };
+
+  TopElements['info-slide'] = {
+    build: function (container, descriptor, ctx) {
+      var wrap = document.createElement('div');
+      wrap.className = 'info-slide';
+
+      var ex = ctx.example;
+
+      if (ex.title) {
+        var t = document.createElement('div');
+        t.className = 'info-title';
+        renderText(t, ex.title);
+        wrap.appendChild(t);
+      }
+
+      if (ex.text) {
+        var b = document.createElement('div');
+        b.className = 'info-body';
+        renderText(b, ex.text);
+        wrap.appendChild(b);
+      }
+
+      container.appendChild(wrap);
+    }
+  };
+  TopElements['svg'] = {
+    build: function (container, descriptor, ctx) {
+      var wrap = document.createElement('div');
+      wrap.className = 'svg-wrap' + (descriptor.class ? ' ' + descriptor.class : '');
+      wrap.innerHTML = ctx.example.svg || '';
+      container.appendChild(wrap);
     }
   };
 
@@ -269,6 +309,15 @@ AnswerElements.insert = {
     window.scrollTo(0, 0);
   }
 
+    /* Устанавливает тему фона по полю phase.theme.
+     'default' — текущая тема.
+     'strict'  — строгая.
+     Любое другое значение игнорируется. */
+  function applyTheme(phase) {
+    var theme = (phase && phase.theme) || 'default';
+    document.body.setAttribute('data-theme', theme);
+  }
+
   /* По ?g=... или первый зарегистрированный генератор. */
   function selectGenerator() {
     var registry = window.ExampleGenerators || {};
@@ -346,17 +395,62 @@ AnswerElements.insert = {
     return list;
   }
 
+  /* Возвращает режим прогресса для фазы.
+     Поддерживает старые hideProgress / groupKey для совместимости. */
+  function progressMode(phase) {
+    if (phase.progress)     return phase.progress;
+    if (phase.hideProgress) return 'hidden';
+    if (phase.groupKey)     return 'group';
+    return 'individual';
+  }
+
   function updateHeader() {
     els.phaseLabel.textContent = state.phase.label;
 
+    var mode = progressMode(state.phase);
+
+    if (mode === 'hidden') {
+      els.progressBar.style.display   = 'none';
+      els.progressLabel.style.display = 'none';
+      return;
+    }
+    els.progressBar.style.display   = '';
+    els.progressLabel.style.display = '';
+
+    if (mode === 'group') {
+      els.progressLabel.textContent =
+        'Шаг ' + state.groupIndex + ' / ' + state.groupTotal;
+      els.progressFill.style.width =
+        (state.groupIndex / state.groupTotal * 100) + '%';
+      return;
+    }
+
+    /* individual */
     if (state.isInfo) {
       var current = Math.min(state.solved + 1, state.phase.total);
       els.progressLabel.textContent = 'Слайд ' + current + ' / ' + state.phase.total;
-    } else {
-      els.progressLabel.textContent = 'Решено: ' + state.solved + ' / ' + state.phase.total;
+      els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
+      return;
     }
 
-    els.progressFill.style.width = (state.solved / state.phase.total * 100) + '%';
+    els.progressLabel.textContent = 'Решено: ' + state.solved + ' / ' + state.phase.total;
+    els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
+  }
+
+  /* Для progress='group' считает номер текущей фазы в группе
+     и общее число фаз с progress='group'. */
+  function computeGroupInfo(phases, index) {
+    if (progressMode(phases[index]) !== 'group') {
+      return { index: 0, total: 0 };
+    }
+    var position = 0, total = 0;
+    for (var i = 0; i < phases.length; i++) {
+      if (progressMode(phases[i]) === 'group') {
+        total++;
+        if (i <= index) position++;
+      }
+    }
+    return { index: position, total: total };
   }
 
   function updateCheckButton() {
@@ -418,12 +512,19 @@ AnswerElements.insert = {
     state.locked     = false;
     state.isInfo     = state.phase.kind === 'info';
 
-    state.queue       = buildQueue(state.phase);
-    state.allExamples = state.allExamples.concat(state.queue);
+    var gi = computeGroupInfo(state.generator.phases, index);  
+    state.groupIndex = gi.index;                                
+    state.groupTotal = gi.total; 
+
+    state.queue = buildQueue(state.phase);
+    if (!state.isInfo) {
+      state.allExamples = state.allExamples.concat(state.queue);
+    }
 
     updateHeader();
     updateCheckButton();
     showScreen('task');
+    applyTheme(state.phase);
 
     if (state.phase.intro && index > 0) showBanner(state.phase.intro, nextExample);
     else nextExample();
@@ -449,6 +550,7 @@ AnswerElements.insert = {
     els.btnGotIt.hidden      = true;
     els.btnCheck.disabled    = false;
     els.card.classList.remove('correct', 'wrong');
+    els.card.classList.toggle('info-mode', state.isInfo);
 
     renderHint(state.phase);
 
@@ -456,7 +558,28 @@ AnswerElements.insert = {
       state.widgets[0].handle.focus();
     }
   }
+  /* Сохраняет ответ ученика для показа на финальном экране.
+     Вызывается при первой ошибке. Если генератор уже задал
+     ex.userAnswerText — не трогает. */
+  function saveUserAnswer(collected, ex) {
+    if (ex.userAnswerText != null) return;
 
+    for (var i = 0; i < state.widgets.length; i++) {
+      var id = state.widgets[i].id;
+      var v  = collected[id];
+
+      if (v === null || v === undefined || v === false) continue;
+      if (v === true) { ex.userAnswerText = '✓'; return; }
+      if (typeof v === 'object' && v.num !== undefined && v.den !== undefined) {
+        ex.userAnswerText = v.num + '/' + v.den;
+        return;
+      }
+      ex.userAnswerText = String(v);
+      return;
+    }
+
+    ex.userAnswerText = '—';
+  }
   function collectAnswers() {
     var out = {};
     var firstEmpty = null;
@@ -520,6 +643,7 @@ AnswerElements.insert = {
     }
 
     /* неверно — показываем правильный ответ и ждём «Понял» */
+    saveUserAnswer(bag.collected, state.current);
     state.current.hadError = true;
     els.card.classList.add('wrong');
     playOverlay('✗', 'bad');
@@ -548,7 +672,84 @@ AnswerElements.insert = {
     if (next < state.generator.phases.length) startPhase(next);
     else showResults();
   }
+  /* Максимальная длина вопроса в списке результатов. */
+  var MAX_QUESTION_LENGTH = 100;
 
+  /* Обрезает текст, не разрывая HTML-теги и $...$-формулы. */
+  function truncateQuestion(text, max) {
+    if (!text) return '';
+    if (text.length <= max) return text;
+
+    var cut = text.slice(0, max);
+
+    var lastOpen  = cut.lastIndexOf('<');
+    var lastClose = cut.lastIndexOf('>');
+    if (lastOpen > lastClose) cut = cut.slice(0, lastOpen);
+
+    var dollars = (cut.match(/\$/g) || []).length;
+    if (dollars % 2 !== 0) cut = cut.slice(0, cut.lastIndexOf('$'));
+
+    return cut.trim() + '…';
+  }
+
+  /* Достаёт текст ответа ученика для показа в скобках.
+     Приоритет: ex.userAnswerText (задан генератором) → best-effort по userAnswer. */
+  function getUserAnswerText(ex) {
+    if (ex.userAnswerText != null) return String(ex.userAnswerText);
+
+    var collected = ex.userAnswer;
+    if (!collected) return null;
+
+    var keys = Object.keys(collected);
+    if (keys.length !== 1) return null;
+
+    var v = collected[keys[0]];
+    if (v === null || v === undefined || v === false) return null;
+    if (v === true) return '✓';
+    if (typeof v === 'object' && v.num !== undefined && v.den !== undefined) {
+      return v.num + '/' + v.den;
+    }
+    return String(v);
+  }
+
+  /* Собирает один элемент списка результатов. */
+  function buildResultItem(phase, ex) {
+    var div = document.createElement('div');
+    div.className = 'result-item ' + (ex.hadError ? 'bad' : 'ok');
+
+    /* первая строка — вопрос */
+    var qEl = document.createElement('div');
+    qEl.className = 'result-question';
+    var qText = String(ex.text != null ? ex.text : '');
+    renderText(qEl, truncateQuestion(qText, MAX_QUESTION_LENGTH));
+    div.appendChild(qEl);
+
+    /* вторая строка — правильный ответ (зелёный) и ответ ученика (серый в скобках) */
+    var aEl = document.createElement('div');
+    aEl.className = 'result-answers';
+
+    var correctText = (typeof phase.formatAnswer === 'function')
+      ? String(phase.formatAnswer(ex))
+      : String(ex.answer);
+
+    var cEl = document.createElement('span');
+    cEl.className = 'result-correct';
+    renderText(cEl, correctText);
+    aEl.appendChild(cEl);
+
+    if (ex.hadError) {
+      var userText = getUserAnswerText(ex);
+      if (userText) {
+        var uEl = document.createElement('span');
+        uEl.className = 'result-user';
+        uEl.textContent = '(' + userText + ')';
+        aEl.appendChild(uEl);
+      }
+    }
+
+    div.appendChild(aEl);
+    return div;
+  }
   /* ───────────── финальный экран ───────────── */
   function showResults() {
     showScreen('result');
@@ -576,22 +777,7 @@ AnswerElements.insert = {
       grid.className = 'results-grid';
 
       items.forEach(function (e) {
-        var div = document.createElement('div');
-        div.className = 'result-item ' + (e.hadError ? 'bad' : 'ok');
-
-        var answerText = (typeof phase.formatAnswer === 'function')
-          ? phase.formatAnswer(e)
-          : String(e.answer);
-
-        renderText(div, e.text + '   ' + answerText);
-
-        if (e.hadError) {
-          var note = document.createElement('span');
-          note.className = 'note';
-          note.textContent = 'решён с ошибкой';
-          div.appendChild(note);
-        }
-        grid.appendChild(div);
+        grid.appendChild(buildResultItem(phase, e));
       });
       els.results.appendChild(grid);
     });
@@ -611,8 +797,8 @@ AnswerElements.insert = {
     els.banner.classList.add('show');
     setTimeout(function () {
       els.banner.classList.remove('show');
-      setTimeout(cb, 320);
-    }, 1600);
+      setTimeout(cb, 100);
+    }, 600);
   }
 
   /* ───────────── события ───────────── */
