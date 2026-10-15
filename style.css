@@ -716,6 +716,16 @@ h1 {
   align-items: center;
   justify-content: center;
 }
+
+#btn-back {
+  padding: 13px 18px;
+  background: var(--soft-2);
+  color: var(--muted);
+  box-shadow: none;
+  font-weight: 700;
+}
+#btn-back:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
+#btn-back:disabled { opacity: .35; }
 /* ═══════════════════════════════════════════════════════════
    Медиа-запросы
    ═══════════════════════════════════════════════════════════ */

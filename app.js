@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  /* ───────────── DOM ───────────── */
+  /* ═════════════ DOM ═════════════ */
+
   var els = {
     screens: {
       start:  document.getElementById('screen-start'),
@@ -16,6 +17,7 @@
     topPanel:      document.getElementById('top-panel'),
     bottomPanel:   document.getElementById('bottom-panel'),
     btnCheck:      document.getElementById('btn-check'),
+    btnBack:       document.getElementById('btn-back'),
     btnGotIt:      document.getElementById('btn-got-it'),
     feedback:      document.getElementById('feedback'),
     hint:          document.getElementById('hint'),
@@ -30,7 +32,8 @@
     startRules:    document.getElementById('start-rules')
   };
 
-  /* ───────────── состояние ───────────── */
+  /* ═════════════ состояние ═════════════ */
+
   var state = {
     generator:   null,
     phaseIndex:  0,
@@ -42,17 +45,19 @@
     locked:      false,
     isInfo:      false,
     widgets:     [],
-    groupIndex: 0,   // ← NEW: номер текущей фазы внутри группы
-    groupTotal: 0    // ← NEW: сколько всего фаз в группе
+    groupIndex:  0,
+    groupTotal:  0,
+    history:     [],     /* { kind, phase, ex, correct?, expected?, collected? } */
+    viewIndex:   null    /* null = live, число = индекс в history */
   };
 
-  /* ───────────── реестры элементов ───────────── */
+  /* ═════════════ реестры элементов ═════════════ */
+
   var TopElements    = window.TopElements    = window.TopElements    || {};
   var AnswerElements = window.AnswerElements = window.AnswerElements || {};
 
-  /* ───────────── рендер текста с LaTeX ───────────── */
-  /* Обычный текст выводится как есть, <br> и \n превращаются в перенос.
-     Если строка содержит $...$, KaTeX (auto-render) сам найдёт формулы. */
+  /* ═════════════ рендер текста с LaTeX ═════════════ */
+
   function renderText(el, text) {
     text = text == null ? '' : String(text);
 
@@ -63,7 +68,7 @@
       .replace(/&lt;br\s*\/?&gt;/gi, '<br>')
       .replace(/&lt;(\/?)(b|strong)&gt;/gi, '<$1$2>')
       .replace(/&lt;(\/?)(i|em)&gt;/gi, '<$1$2>')
-      .replace(/&lt;(\/?)(ol|ul|li)&gt;/gi, '<$1$2>')   // ← NEW
+      .replace(/&lt;(\/?)(ol|ul|li)&gt;/gi, '<$1$2>')
       .replace(/\r?\n/g, '<br>');
 
     el.innerHTML = html;
@@ -82,9 +87,8 @@
     } catch (e) { /* оставляем как есть */ }
   }
 
-  /* ───────────── верхняя панель ───────────── */
+  /* ═════════════ верхняя панель ═════════════ */
 
-  /* строка примера; descriptor.class позволяет задать свой CSS-класс */
   TopElements['example-string'] = {
     build: function (container, descriptor, ctx) {
       var div = document.createElement('div');
@@ -118,6 +122,7 @@
       container.appendChild(wrap);
     }
   };
+
   TopElements['svg'] = {
     build: function (container, descriptor, ctx) {
       var wrap = document.createElement('div');
@@ -127,9 +132,8 @@
     }
   };
 
-  /* ───────────── нижняя панель ───────────── */
+  /* ═════════════ нижняя панель ═════════════ */
 
-  /* поле положительного числа */
   AnswerElements.number = {
     build: function (container, descriptor, ctx) {
       var input = document.createElement('input');
@@ -154,12 +158,12 @@
         },
         lock:  function () { input.disabled = true; },
         reset: function () { input.value = ''; input.disabled = false; },
-        focus: function () { input.focus(); }
+        focus: function () { input.focus(); },
+        restore: function (v) { input.value = v == null ? '' : String(v); }
       };
     }
   };
 
-  /* кнопка «±» — read() возвращает 1 или -1 */
   AnswerElements.sign = {
     build: function (container) {
       var value = 1;
@@ -182,12 +186,15 @@
           btn.disabled = false;
           btn.classList.remove('active');
         },
-        focus: function () { btn.focus(); }
+        focus: function () { btn.focus(); },
+        restore: function (v) {
+          value = v === -1 ? -1 : 1;
+          btn.classList.toggle('active', value === -1);
+        }
       };
     }
   };
 
-  /* чекбокс; при descriptor.group — радио-поведение внутри группы */
   AnswerElements.checkbox = {
     build: function (container, descriptor, ctx) {
       var wrap = document.createElement('label');
@@ -222,85 +229,86 @@
         read:  function () { return !!box.checked; },
         lock:  function () { box.disabled = true; },
         reset: function () { box.checked = false; box.disabled = false; },
-        focus: function () { box.focus(); }
+        focus: function () { box.focus(); },
+        restore: function (v) { box.checked = !!v; }
       };
     }
   };
 
   AnswerElements.text = {
-  build: function (container, descriptor, ctx) {
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    input.className = 'answer-input text-input';
-    input.placeholder = descriptor.placeholder || '?';
+    build: function (container, descriptor, ctx) {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.className = 'answer-input text-input';
+      input.placeholder = descriptor.placeholder || '?';
 
-    var sel = { start: 0, end: 0 };
+      var sel = { start: 0, end: 0 };
 
-    /* запоминаем позицию курсора — пригодится, когда кнопка заберёт фокус */
-    function remember() {
-      sel.start = input.selectionStart || 0;
-      sel.end   = input.selectionEnd   || 0;
-    }
-    ['keyup', 'mouseup', 'select', 'input', 'click'].forEach(function (ev) {
-      input.addEventListener(ev, remember);
-    });
-
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); ctx.submit(); }
-    });
-
-    container.appendChild(input);
-
-    return {
-      read:  function () {
-        var v = input.value.trim();
-        return v === '' ? null : v;
-      },
-      lock:  function () { input.disabled = true; },
-      reset: function () {
-        input.value = '';
-        input.disabled = false;
-        sel = { start: 0, end: 0 };
-      },
-      focus: function () { input.focus(); },
-      insertAtCursor: function (text) {
-        var start = (document.activeElement === input) ? input.selectionStart : sel.start;
-        var end   = (document.activeElement === input) ? input.selectionEnd   : sel.end;
-        var v = input.value;
-        input.value = v.slice(0, start) + text + v.slice(end);
-        var pos = start + text.length;
-        input.setSelectionRange(pos, pos);
-        remember();
+      function remember() {
+        sel.start = input.selectionStart || 0;
+        sel.end   = input.selectionEnd   || 0;
       }
-    };
-  }
-};
+      ['keyup', 'mouseup', 'select', 'input', 'click'].forEach(function (ev) {
+        input.addEventListener(ev, remember);
+      });
 
-AnswerElements.insert = {
-  build: function (container, descriptor, ctx) {
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'insert-btn';
-    btn.textContent = descriptor.label || descriptor.value || '';
-    if (descriptor.title) btn.title = descriptor.title;
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); ctx.submit(); }
+      });
 
-    /* не даём кнопке украсть фокус у поля ввода — курсор не сбросится */
-    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      container.appendChild(input);
 
-    btn.addEventListener('click', function () {
-      var target = findWidgetById(descriptor.target);
-      if (!target || typeof target.insertAtCursor !== 'function') return;
-      target.insertAtCursor(descriptor.value != null ? descriptor.value : '');
-    });
+      return {
+        read:  function () {
+          var v = input.value.trim();
+          return v === '' ? null : v;
+        },
+        lock:  function () { input.disabled = true; },
+        reset: function () {
+          input.value = '';
+          input.disabled = false;
+          sel = { start: 0, end: 0 };
+        },
+        focus: function () { input.focus(); },
+        restore: function (v) { input.value = v == null ? '' : String(v); },
+        insertAtCursor: function (text) {
+          var start = (document.activeElement === input) ? input.selectionStart : sel.start;
+          var end   = (document.activeElement === input) ? input.selectionEnd   : sel.end;
+          var v = input.value;
+          input.value = v.slice(0, start) + text + v.slice(end);
+          var pos = start + text.length;
+          input.setSelectionRange(pos, pos);
+          remember();
+        }
+      };
+    }
+  };
 
-    container.appendChild(btn);
-    return null;   /* кнопка не участвует в сборе ответа */
-  }
-};
+  AnswerElements.insert = {
+    build: function (container, descriptor, ctx) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'insert-btn';
+      btn.textContent = descriptor.label || descriptor.value || '';
+      if (descriptor.title) btn.title = descriptor.title;
 
-  /* ───────────── утилиты ───────────── */
+      btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+
+      btn.addEventListener('click', function () {
+        var target = findWidgetById(descriptor.target);
+        if (!target || typeof target.insertAtCursor !== 'function') return;
+        target.insertAtCursor(descriptor.value != null ? descriptor.value : '');
+      });
+
+      container.appendChild(btn);
+      return null;
+    }
+  };
+
+  /* ═════════════ утилиты ═════════════ */
+
   function showScreen(name) {
     Object.keys(els.screens).forEach(function (k) {
       els.screens[k].classList.toggle('active', k === name);
@@ -308,16 +316,11 @@ AnswerElements.insert = {
     window.scrollTo(0, 0);
   }
 
-    /* Устанавливает тему фона по полю phase.theme.
-     'default' — текущая тема.
-     'strict'  — строгая.
-     Любое другое значение игнорируется. */
   function applyTheme(phase) {
     var theme = (phase && phase.theme) || 'default';
     document.body.setAttribute('data-theme', theme);
   }
 
-  /* По ?g=... или первый зарегистрированный генератор. */
   function selectGenerator() {
     var registry = window.ExampleGenerators || {};
     var ids = Object.keys(registry);
@@ -334,9 +337,8 @@ AnswerElements.insert = {
     return null;
   }
 
-  /* ───────────── построение панелей ───────────── */
+  /* ═════════════ построение панелей ═════════════ */
 
-  /* спецификация панели может быть массивом или функцией(example) → массив */
   function resolveSpec(spec, example) {
     if (typeof spec === 'function') return spec(example) || [];
     return spec || [];
@@ -374,9 +376,8 @@ AnswerElements.insert = {
     });
   }
 
-  /* ───────────── очередь ───────────── */
+  /* ═════════════ очередь и прогресс ═════════════ */
 
-  /* Набираем total уникальных примеров (по ключу ex.key || ex.text). */
   function buildQueue(phase) {
     var used = {}, list = [], guard = 0;
     while (list.length < phase.total && guard++ < 20000) {
@@ -394,8 +395,6 @@ AnswerElements.insert = {
     return list;
   }
 
-  /* Возвращает режим прогресса для фазы.
-     Поддерживает старые hideProgress / groupKey для совместимости. */
   function progressMode(phase) {
     if (phase.progress)     return phase.progress;
     if (phase.hideProgress) return 'hidden';
@@ -424,7 +423,6 @@ AnswerElements.insert = {
       return;
     }
 
-    /* individual */
     if (state.isInfo) {
       var current = Math.min(state.solved + 1, state.phase.total);
       els.progressLabel.textContent = 'Слайд ' + current + ' / ' + state.phase.total;
@@ -436,8 +434,6 @@ AnswerElements.insert = {
     els.progressFill.style.width  = (state.solved / state.phase.total * 100) + '%';
   }
 
-  /* Для progress='group' считает номер текущей фазы в группе
-     и общее число фаз с progress='group'. */
   function computeGroupInfo(phases, index) {
     if (progressMode(phases[index]) !== 'group') {
       return { index: 0, total: 0 };
@@ -452,11 +448,8 @@ AnswerElements.insert = {
     return { index: position, total: total };
   }
 
-  function updateCheckButton() {
-    els.btnCheck.textContent = state.isInfo ? 'Дальше' : 'Проверить';
-  }
+  /* ═════════════ стартовый экран ═════════════ */
 
-  /* ───────────── стартовый экран ───────────── */
   function renderStartScreen() {
     var gen = selectGenerator();
 
@@ -479,9 +472,8 @@ AnswerElements.insert = {
     });
   }
 
-  /* ───────────── подсказки ───────────── */
+  /* ═════════════ подсказки ═════════════ */
 
-  /* hint: строка | массив строк | функция(example) → строка или массив */
   function renderHint(phase) {
     var h = phase && phase.hint;
     if (typeof h === 'function') h = h(state.current);
@@ -491,16 +483,18 @@ AnswerElements.insert = {
     renderText(els.hint, h || '');
   }
 
-  /* ───────────── ход игры ───────────── */
+  /* ═════════════ ход игры ═════════════ */
+
   function startGame() {
     var gen = selectGenerator();
     if (!gen) { alert('Генератор не подключён.'); return; }
 
-    /* кнопка должна быть выключена, но на всякий случай */
     if (gen.ready && typeof gen.ready.then === 'function' && !gen._ready) return;
 
     state.generator   = gen;
     state.allExamples = [];
+    state.history     = [];      /* единственная точка сброса истории */
+    state.viewIndex   = null;
     startPhase(0);
   }
 
@@ -510,10 +504,12 @@ AnswerElements.insert = {
     state.solved     = 0;
     state.locked     = false;
     state.isInfo     = state.phase.kind === 'info';
+    state.viewIndex  = null;
+    /* history НЕ сбрасываем — она копится в течение всего урока */
 
-    var gi = computeGroupInfo(state.generator.phases, index);  
-    state.groupIndex = gi.index;                                
-    state.groupTotal = gi.total; 
+    var gi = computeGroupInfo(state.generator.phases, index);
+    state.groupIndex = gi.index;
+    state.groupTotal = gi.total;
 
     state.queue = buildQueue(state.phase);
     if (!state.isInfo) {
@@ -521,7 +517,6 @@ AnswerElements.insert = {
     }
 
     updateHeader();
-    updateCheckButton();
     showScreen('task');
     applyTheme(state.phase);
 
@@ -532,9 +527,24 @@ AnswerElements.insert = {
   function nextExample() {
     if (state.queue.length === 0) { finishPhase(); return; }
 
-    state.current = state.queue.shift();
-    state.locked  = false;
+    state.current   = state.queue.shift();
+    state.locked    = false;
+    state.viewIndex = null;
 
+    /* первый показ этого примера — кладём в историю */
+    if (!state.current._inHistory) {
+      state.current._inHistory = true;
+      state.history.push({
+        phase: state.phase,
+        ex:    state.current,
+        kind:  state.isInfo ? 'info' : 'task'
+      });
+    }
+
+    displayCurrent();
+  }
+
+  function displayCurrent() {
     buildTopPanel(state.phase, state.current);
 
     if (state.isInfo) {
@@ -549,17 +559,125 @@ AnswerElements.insert = {
     els.btnGotIt.hidden      = true;
     els.btnCheck.disabled    = false;
     els.card.classList.remove('correct', 'wrong');
-    els.card.classList.toggle('info-mode', state.isInfo);
 
     renderHint(state.phase);
+    updateNavButtons();
 
     if (!state.isInfo && state.widgets.length && state.widgets[0].handle.focus) {
       state.widgets[0].handle.focus();
     }
   }
-  /* Сохраняет ответ ученика для показа на финальном экране.
-     Вызывается при первой ошибке. Если генератор уже задал
-     ex.userAnswerText — не трогает. */
+
+  /* ═════════════ навигация ═════════════ */
+
+  function updateNavButtons() {
+    els.btnBack.hidden = false;
+
+    if (state.viewIndex === null) {
+      els.btnBack.disabled     = state.locked || state.history.length < 2;
+      els.btnCheck.textContent = state.isInfo ? 'Дальше' : 'Проверить';
+      return;
+    }
+
+    /* режим просмотра: смотрим на элемент под курсором */
+    var current = state.history[state.viewIndex];
+    els.btnBack.disabled = state.viewIndex === 0;
+
+    if (current.kind === 'info') {
+      els.btnCheck.textContent = 'Вперёд';
+    } else {
+      els.btnCheck.textContent = 'Вернуться';
+    }
+  }
+
+  /* Показывает исторический элемент: слайд или отвеченный пример. */
+  function showHistory(index) {
+    if (index < 0 || index >= state.history.length) return;
+
+    /* если это и есть текущий элемент — переключаемся в live-режим,
+       не заходя в режим просмотра */
+    if (state.history[index].ex === state.current) {
+      backToCurrent();
+      return;
+    }
+
+    var entry = state.history[index];
+    state.viewIndex = index;
+    if (entry.kind === 'info') {
+      buildTopPanel(entry.phase, entry.ex);
+      els.bottomPanel.innerHTML = '';
+      state.widgets = [];
+      els.feedback.textContent = '';
+      els.feedback.className   = 'feedback';
+      els.card.classList.remove('correct', 'wrong');
+      els.btnGotIt.hidden   = true;
+      els.btnCheck.disabled = false;
+      updateNavButtons();
+      return;
+    }
+
+    /* task */
+    state.locked = true;
+
+    buildTopPanel(entry.phase, entry.ex);
+    buildBottomPanel(entry.phase, entry.ex);
+
+    var collected = entry.ex._lastCollected;
+    state.widgets.forEach(function (w) {
+      if (collected && Object.prototype.hasOwnProperty.call(collected, w.id) &&
+          w.handle.restore) {
+        w.handle.restore(collected[w.id]);
+      }
+      if (w.handle.lock) w.handle.lock();
+    });
+
+    if (entry.ex.answered) {
+      els.feedback.textContent = 'Верно!';
+      els.feedback.className   = 'feedback ok';
+      els.card.classList.add('correct');
+      els.card.classList.remove('wrong');
+    } else if (entry.ex.hadError) {
+      var ansText = typeof entry.phase.formatAnswer === 'function'
+        ? entry.phase.formatAnswer(entry.ex)
+        : String(entry.ex.answer);
+      renderText(els.feedback, 'Правильный ответ: ' + ansText);
+      els.feedback.className = 'feedback bad';
+      els.card.classList.add('wrong');
+      els.card.classList.remove('correct');
+    } else {
+      els.feedback.textContent = '';
+      els.feedback.className   = 'feedback';
+      els.card.classList.remove('correct', 'wrong');
+    }
+
+    els.btnGotIt.hidden   = true;
+    els.btnCheck.disabled = false;
+    updateNavButtons();
+  }
+
+  function backToCurrent() {
+    state.viewIndex = null;
+    state.locked    = false;
+    displayCurrent();
+  }
+
+  function onBack() {
+    if (state.viewIndex !== null) {
+      if (state.viewIndex > 0) showHistory(state.viewIndex - 1);
+      return;
+    }
+
+    /* во время паузы после верного ответа / ожидания «Понял» — не листаем */
+    if (state.locked) return;
+
+    /* последний элемент истории — это текущий пример,
+       поэтому идём на один назад */
+    if (state.history.length < 2) return;
+    showHistory(state.history.length - 2);
+  }
+
+  /* ═════════════ сбор ответа ═════════════ */
+
   function saveUserAnswer(collected, ex) {
     if (ex.userAnswerText != null) return;
 
@@ -579,6 +697,7 @@ AnswerElements.insert = {
 
     ex.userAnswerText = '—';
   }
+
   function collectAnswers() {
     var out = {};
     var firstEmpty = null;
@@ -590,11 +709,15 @@ AnswerElements.insert = {
     return { collected: out, firstEmpty: firstEmpty };
   }
 
+  /* ═════════════ проверка ответа ═════════════ */
+
   function checkAnswer() {
     if (state.locked || !state.current) return;
 
-    /* ознакомительный слайд: кнопка работает как «Дальше» */
+    /* info-слайд: кнопка работает как «Дальше» */
     if (state.isInfo) {
+      /* слайд уже записан в историю в nextExample — здесь не дублируем */
+
       state.solved++;
       updateHeader();
       if (state.queue.length === 0) finishPhase();
@@ -625,9 +748,13 @@ AnswerElements.insert = {
     state.locked = true;
     state.widgets.forEach(function (w) { w.handle.lock && w.handle.lock(); });
     els.btnCheck.disabled = true;
+    els.btnBack.disabled  = true;
 
     if (correct) {
       state.solved++;
+      state.current.answered        = true;              
+      state.current._lastCollected  = bag.collected;
+
       els.card.classList.add('correct');
       playOverlay('✓', 'ok');
       els.feedback.textContent = 'Верно!';
@@ -641,11 +768,11 @@ AnswerElements.insert = {
       return;
     }
 
-    /* неверно — показываем правильный ответ и ждём «Понял» */
+    /* неверно: в историю попадёт при «Понял» */
     saveUserAnswer(bag.collected, state.current);
-    state.current.hadError = true;
-    els.card.classList.add('wrong');
-    playOverlay('✗', 'bad');
+    state.current.hadError       = true;
+    state.current.answered       = false;               /* ← NEW */
+    state.current._lastCollected = bag.collected;        /* ← NEW */
 
     var ansText = expected != null
       ? String(expected)
@@ -653,13 +780,14 @@ AnswerElements.insert = {
           ? state.phase.formatAnswer(state.current)
           : String(state.current.answer));
 
+    els.card.classList.add('wrong');
+    playOverlay('✗', 'bad');
     renderText(els.feedback, 'Правильный ответ: ' + ansText);
     els.feedback.className = 'feedback bad';
     els.btnGotIt.hidden    = false;
     els.btnGotIt.focus();
   }
 
-  /* «Понял» — пример возвращается в конец очереди */
   function onGotIt() {
     if (!state.locked || !state.current) return;
     state.queue.push(state.current);
@@ -671,10 +799,11 @@ AnswerElements.insert = {
     if (next < state.generator.phases.length) startPhase(next);
     else showResults();
   }
-  /* Максимальная длина вопроса в списке результатов. */
+
+  /* ═════════════ финальный экран ═════════════ */
+
   var MAX_QUESTION_LENGTH = 100;
 
-  /* Обрезает текст, не разрывая HTML-теги и $...$-формулы. */
   function truncateQuestion(text, max) {
     if (!text) return '';
     if (text.length <= max) return text;
@@ -691,8 +820,6 @@ AnswerElements.insert = {
     return cut.trim() + '…';
   }
 
-  /* Достаёт текст ответа ученика для показа в скобках.
-     Приоритет: ex.userAnswerText (задан генератором) → best-effort по userAnswer. */
   function getUserAnswerText(ex) {
     if (ex.userAnswerText != null) return String(ex.userAnswerText);
 
@@ -711,19 +838,16 @@ AnswerElements.insert = {
     return String(v);
   }
 
-  /* Собирает один элемент списка результатов. */
   function buildResultItem(phase, ex) {
     var div = document.createElement('div');
     div.className = 'result-item ' + (ex.hadError ? 'bad' : 'ok');
 
-    /* первая строка — вопрос */
     var qEl = document.createElement('div');
     qEl.className = 'result-question';
     var qText = String(ex.text != null ? ex.text : '');
     renderText(qEl, truncateQuestion(qText, MAX_QUESTION_LENGTH));
     div.appendChild(qEl);
 
-    /* вторая строка — правильный ответ (зелёный) и ответ ученика (серый в скобках) */
     var aEl = document.createElement('div');
     aEl.className = 'result-answers';
 
@@ -749,7 +873,7 @@ AnswerElements.insert = {
     div.appendChild(aEl);
     return div;
   }
-  /* ───────────── финальный экран ───────────── */
+
   function showResults() {
     showScreen('result');
 
@@ -782,17 +906,18 @@ AnswerElements.insert = {
     });
   }
 
-  /* ───────────── анимации ───────────── */
+  /* ═════════════ анимации ═════════════ */
+
   function playOverlay(symbol, kind) {
     els.overlayIcon.textContent = symbol;
     els.overlayIcon.className   = 'overlay-icon ' + kind;
     els.overlay.classList.remove('show');
-    void els.overlay.offsetWidth;   /* перезапуск CSS-анимации */
+    void els.overlay.offsetWidth;
     els.overlay.classList.add('show');
   }
 
   function showBanner(html, cb) {
-    els.banner.innerHTML = html;
+    renderText(els.banner, html);
     els.banner.classList.add('show');
     setTimeout(function () {
       els.banner.classList.remove('show');
@@ -800,28 +925,47 @@ AnswerElements.insert = {
     }, 300);
   }
 
-  /* ───────────── события ───────────── */
+  /* ═════════════ события ═════════════ */
+
   els.btnStart.addEventListener('click',   startGame);
   els.btnRestart.addEventListener('click', startGame);
-  els.btnCheck.addEventListener('click',   checkAnswer);
   els.btnGotIt.addEventListener('click',   onGotIt);
+  els.btnBack.addEventListener('click',    onBack);
 
-  /* ───────────── инициализация стартового экрана ───────────── */
-  /* Ждём появления генератора (если он регистрируется асинхронно),
-     затем — его ready (если данные грузятся через fetch).
-     Кнопка «Начать» включается только когда всё готово. */
+  els.btnCheck.addEventListener('click', function () {
+    if (state.viewIndex === null) {
+      checkAnswer();
+      return;
+    }
+
+    var current = state.history[state.viewIndex];
+
+    /* info-слайд: шагаем на один вперёд */
+    if (current.kind === 'info') {
+      if (state.viewIndex + 1 < state.history.length) {
+        showHistory(state.viewIndex + 1);
+      } else {
+        backToCurrent();
+      }
+      return;
+    }
+
+    /* task-элемент: прыгаем к live одним нажатием */
+    backToCurrent();
+  });
+
+  /* ═════════════ инициализация стартового экрана ═════════════ */
+
   (function waitForStartInfo(tries) {
     tries = tries || 0;
     var gen = selectGenerator();
 
-    /* генератора пока нет — ждём до 3 секунд */
     if (!gen) {
       renderStartScreen();
       if (tries < 30) setTimeout(function () { waitForStartInfo(tries + 1); }, 100);
       return;
     }
 
-    /* генератор есть, но данные ещё грузятся — ждём ready */
     if (gen.ready && typeof gen.ready.then === 'function' && !gen._ready) {
       els.btnStart.disabled = true;
       var finish = function () {
@@ -833,7 +977,6 @@ AnswerElements.insert = {
       return;
     }
 
-    /* всё готово */
     renderStartScreen();
   })();
 
