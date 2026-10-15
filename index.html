@@ -28,8 +28,10 @@
     <div class="top-panel" id="top-panel"></div>
       <div class="answer-row">
         <div class="bottom-panel" id="bottom-panel"></div>
-        <button class="btn" id="btn-back" title="Назад" aria-label="Назад" hidden>← Назад</button>
-        <button class="btn primary" id="btn-check">Проверить</button>
+        <div class="nav-row">
+          <button class="btn" id="btn-back" title="Назад" aria-label="Назад" hidden>← Назад</button>
+          <button class="btn primary" id="btn-check">Проверить</button>
+        </div>
       </div>
     <div class="hint" id="hint"></div>
     <div class="feedback" id="feedback"></div>
@@ -55,6 +57,7 @@
 
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
 <script src="generators/lib.js?v=__COMMIT__"></script>
 <script src="generators/svg.js?v=__COMMIT__"></script>
 

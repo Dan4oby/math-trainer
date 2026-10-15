@@ -229,9 +229,10 @@ h1 {
    ═══════════════════════════════════════════════════════════ */
 
 .card {
+  position: relative;
   background: #fff;
   border-radius: var(--radius-lg);
-  padding: 34px 24px 30px;
+  padding: 34px 24px 60px;   /* нижний padding увеличен, чтобы кнопка не наезжала */
   text-align: center;
   border: 3px solid transparent;
   box-shadow: var(--shadow-card);
@@ -365,10 +366,18 @@ h1 {
 
 .answer-row {
   display: flex;
+  flex-direction: column;    /* поля сверху, кнопки снизу */
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.nav-row {
+  display: flex;
   gap: 12px;
   justify-content: center;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;         /* кнопки всегда в одну линию */
 }
 .bottom-panel {
   display: flex;
