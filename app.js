@@ -559,6 +559,7 @@
     els.btnGotIt.hidden      = true;
     els.btnCheck.disabled    = false;
     els.card.classList.remove('correct', 'wrong');
+    els.card.classList.toggle('info-mode', state.isInfo);   /* ← NEW */
 
     renderHint(state.phase);
     updateNavButtons();
@@ -594,15 +595,17 @@
   function showHistory(index) {
     if (index < 0 || index >= state.history.length) return;
 
-    /* если это и есть текущий элемент — переключаемся в live-режим,
-       не заходя в режим просмотра */
-    if (state.history[index].ex === state.current) {
+    var entry = state.history[index];
+
+    /* если это и есть текущий элемент — переключаемся в live-режим */
+    if (entry.ex === state.current) {
       backToCurrent();
       return;
     }
 
-    var entry = state.history[index];
     state.viewIndex = index;
+    els.card.classList.toggle('info-mode', entry.kind === 'info');   /* ← NEW */
+
     if (entry.kind === 'info') {
       buildTopPanel(entry.phase, entry.ex);
       els.bottomPanel.innerHTML = '';

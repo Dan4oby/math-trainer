@@ -254,10 +254,14 @@ h1 {
   flex-direction: column;
   min-height: 55vh;
 }
-.card.info-mode .answer-row { margin-top: auto; }
 .card.info-mode .hint,
 .card.info-mode .feedback,
-.card.info-mode #btn-got-it { display: none; }
+.card.info-mode #btn-got-it {
+  display: none;
+}
+.card.info-mode .answer-row {
+  margin-top: auto;
+}
 
 @keyframes correctPop {
   0%   { transform: scale(1); }
