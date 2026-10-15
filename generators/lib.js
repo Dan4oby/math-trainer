@@ -4,6 +4,12 @@
   /* ─────────── регистрация генераторов ─────────── */
 
   function register(id, def) {
+    /* присваиваем ключи фазам, у которых их нет */
+    if (def && Array.isArray(def.phases)) {
+      for (var i = 0; i < def.phases.length; i++) {
+        if (!def.phases[i].key) def.phases[i].key = 'phase-' + i;
+      }
+    }
     window.ExampleGenerators = window.ExampleGenerators || {};
     window.ExampleGenerators[id] = def;
     return def;
@@ -221,25 +227,46 @@
 
   /* ─────────── фабрики фаз ─────────── */
 
-  /* Фаза-вопрос с одним правильным вариантом ответа.
+  /* Фаза-вопрос с одним правильным вариантом.
      opts: {
-       key, title,
-       generate       — функция, возвращающая объект вопроса, ИЛИ
-       question       — готовый объект { text, options, correct, key? },
-       label?, hint?, total?, progress?
-     } */
+       title,
+       key?, hint?, progress?, label?,
+       total?,
+       generate      — функция, возвращающая объект вопроса, ИЛИ
+       questions     — массив объектов вопросов, ИЛИ
+       question      — один объект вопроса
+     }
+     Объект вопроса: { text, options, correct } */
   function singleChoicePhase(opts) {
     var generate = opts.generate;
+
     if (!generate) {
-      var fixed = opts.question;
-      generate = function () { return fixed; };
+      var list = opts.questions ||
+                 (opts.question ? [opts.question] : []);
+
+      /* замораживаем ссылку и делаем пошаговый итератор */
+      generate = (function (items) {
+        var i = 0;
+        return function () {
+          if (i >= items.length) return null;
+          return items[i++];
+        };
+      })(list);
     }
+
+    var total = opts.total;
+    if (total == null) {
+      if (opts.questions)      total = opts.questions.length;
+      else if (opts.question)  total = 1;
+      else                     total = 1;
+    }
+
     return {
       key:          opts.key,
       label:        opts.label || 'Вопрос',
       title:        opts.title,
       intro:        opts.intro,
-      total:        opts.total != null ? opts.total : 1,
+      total:        total,
       progress:     opts.progress || 'group',
       hint:         opts.hint,
       top:          [{ type: 'example-string', class: 'question' }],
