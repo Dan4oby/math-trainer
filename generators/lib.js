@@ -301,6 +301,59 @@
     return p;
   }
 
+    /* Фаза-задание с SVG-иллюстрацией над полем ввода.
+     opts: {
+       title,
+       key?, label?, hint?, progress?, total?,
+       questions     — массив объектов вопроса, ИЛИ
+       question      — один объект, ИЛИ
+       generate      — функция, возвращающая объект,
+       bottom?       — описание нижней панели (по умолчанию singleChoicePanel),
+       check?        — функция проверки (по умолчанию checkSingleChoice),
+       formatAnswer? — как показать верный ответ (по умолчанию formatSingleChoice)
+     }
+     Каждый вопрос — { text, svg, ...свои поля }.
+     Формат ответа зависит от выбранных bottom/check. */
+  function svgTaskPhase(opts) {
+    var generate = opts.generate;
+
+    if (!generate) {
+      var list = opts.questions ||
+                 (opts.question ? [opts.question] : []);
+
+      generate = (function (items) {
+        var i = 0;
+        return function () {
+          if (i >= items.length) return null;
+          return items[i++];
+        };
+      })(list);
+    }
+
+    var total = opts.total;
+    if (total == null) {
+      if (opts.questions)     total = opts.questions.length;
+      else if (opts.question) total = 1;
+      else                    total = 1;
+    }
+
+    return {
+      key:          opts.key,
+      label:        opts.label || 'Вопрос',
+      title:        opts.title,
+      total:        total,
+      progress:     opts.progress || 'group',
+      hint:         opts.hint,
+      top: [
+        { type: 'example-string', class: 'question' },
+        { type: 'svg' }
+      ],
+      bottom:       opts.bottom       || singleChoicePanel,
+      generate:     generate,
+      check:        opts.check        || checkSingleChoice,
+      formatAnswer: opts.formatAnswer || formatSingleChoice
+    };
+  }
   /* ─────────── экспорт ─────────── */
 
   window.GeneratorLib = {
@@ -335,7 +388,8 @@
 
     singleChoicePhase:  singleChoicePhase,
     infoPhase:          infoPhase,
-    svgInfoPhase:       svgInfoPhase
+    svgInfoPhase:       svgInfoPhase,
+    svgTaskPhase:       svgTaskPhase
   };
 
 })();
