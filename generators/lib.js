@@ -267,6 +267,7 @@
       title:        opts.title,
       intro:        opts.intro,
       total:        total,
+      wrongAction:  opts.wrongAction,
       progress:     opts.progress || 'group',
       hint:         opts.hint,
       top:          [{ type: 'example-string', class: 'question' }],
@@ -342,6 +343,7 @@
       label:        opts.label || 'Вопрос',
       title:        opts.title,
       total:        total,
+      wrongAction:  opts.wrongAction,
       progress:     opts.progress || 'group',
       hint:         opts.hint,
       top: [
