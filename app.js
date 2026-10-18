@@ -474,13 +474,17 @@
 
   /* ═════════════ подсказки ═════════════ */
 
-  function renderHint(phase) {
+  function getHint(phase, example) {
     var h = phase && phase.hint;
-    if (typeof h === 'function') h = h(state.current);
+    if (typeof h === 'function') h = h(example);
     if (Array.isArray(h)) {
       h = h.length ? h[Math.floor(Math.random() * h.length)] : '';
     }
-    renderText(els.hint, h || '');
+    return h || '';
+  }
+
+  function renderHint(phase) {
+    renderText(els.hint, getHint(phase, state.current));
   }
 
   /* ═════════════ ход игры ═════════════ */
@@ -634,23 +638,17 @@
       if (w.handle.lock) w.handle.lock();
     });
 
-    if (entry.ex.answered) {
+       if (entry.ex.answered) {
       els.feedback.textContent = 'Верно!';
       els.feedback.className   = 'feedback ok';
       els.card.classList.add('correct');
       els.card.classList.remove('wrong');
-    } else if (entry.ex.hadError) {
-      var ansText = typeof entry.phase.formatAnswer === 'function'
-        ? entry.phase.formatAnswer(entry.ex)
-        : String(entry.ex.answer);
-      renderText(els.feedback, 'Правильный ответ: ' + ansText);
+    } else {
+      /* ошибка: текст уже собран при ответе (ответ / подсказка / пусто) */
+      renderText(els.feedback, entry.feedback || '');
       els.feedback.className = 'feedback bad';
       els.card.classList.add('wrong');
       els.card.classList.remove('correct');
-    } else {
-      els.feedback.textContent = '';
-      els.feedback.className   = 'feedback';
-      els.card.classList.remove('correct', 'wrong');
     }
 
     els.btnGotIt.hidden   = true;
@@ -777,15 +775,32 @@
     state.current.answered       = false;               /* ← NEW */
     state.current._lastCollected = bag.collected;        /* ← NEW */
 
-    var ansText = expected != null
-      ? String(expected)
-      : (typeof state.phase.formatAnswer === 'function'
-          ? state.phase.formatAnswer(state.current)
-          : String(state.current.answer));
+    var action = state.phase.wrongAction || 'showAnswer';
+    var feedbackText = '';
+
+    if (action === 'showAnswer') {
+      var ansText = expected != null
+        ? String(expected)
+        : (typeof state.phase.formatAnswer === 'function'
+            ? state.phase.formatAnswer(state.current)
+            : String(state.current.answer));
+      feedbackText = 'Правильный ответ: ' + ansText;
+    } else if (action === 'showHint') {
+      feedbackText = getHint(state.phase, state.current);
+    }
+
+    state.current._pendingHistory = {
+      kind:      'task',
+      phase:     state.phase,
+      ex:        state.current,
+      correct:   false,
+      feedback:  feedbackText,
+      collected: bag.collected
+    };
 
     els.card.classList.add('wrong');
     playOverlay('✗', 'bad');
-    renderText(els.feedback, 'Правильный ответ: ' + ansText);
+    renderText(els.feedback, feedbackText);
     els.feedback.className = 'feedback bad';
     els.btnGotIt.hidden    = false;
     els.btnGotIt.focus();
