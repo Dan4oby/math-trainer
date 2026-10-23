@@ -267,6 +267,7 @@
       title:        opts.title,
       intro:        opts.intro,
       total:        total,
+      strictOrder:  opts.strictOrder, 
       wrongAction:  opts.wrongAction,
       progress:     opts.progress || 'group',
       hint:         opts.hint,

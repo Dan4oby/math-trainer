@@ -638,11 +638,17 @@
       if (w.handle.lock) w.handle.lock();
     });
 
-       if (entry.ex.answered) {
-      els.feedback.textContent = 'Верно!';
-      els.feedback.className   = 'feedback ok';
-      els.card.classList.add('correct');
-      els.card.classList.remove('wrong');
+    if (entry.ex.answered) {
+      if (entry.ex._wasSilent) {
+        els.feedback.textContent = '';
+        els.feedback.className   = 'feedback';
+        els.card.classList.remove('correct', 'wrong');
+      } else {
+        els.feedback.textContent = 'Верно!';
+        els.feedback.className   = 'feedback ok';
+        els.card.classList.add('correct');
+        els.card.classList.remove('wrong');
+      }
     } else {
       /* ошибка: текст уже собран при ответе (ответ / подсказка / пусто) */
       renderText(els.feedback, entry.feedback || '');
@@ -752,20 +758,24 @@
     els.btnBack.disabled  = true;
 
     if (correct) {
+      var silent = state.phase.correctAction === 'silent';
+      state.current._wasSilent = silent;
       state.solved++;
-      state.current.answered        = true;              
-      state.current._lastCollected  = bag.collected;
+      state.current.answered       = true;
+      state.current._lastCollected = bag.collected;
 
-      els.card.classList.add('correct');
-      playOverlay('✓', 'ok');
-      els.feedback.textContent = 'Верно!';
-      els.feedback.className   = 'feedback ok';
+      if (!silent) {
+        els.card.classList.add('correct');
+        playOverlay('✓', 'ok');
+        els.feedback.textContent = 'Верно!';
+        els.feedback.className   = 'feedback ok';
+      }
       updateHeader();
 
       setTimeout(function () {
         if (state.queue.length === 0) finishPhase();
         else nextExample();
-      }, 850);
+      }, silent ? 300 : 850);
       return;
     }
 
@@ -808,7 +818,15 @@
 
   function onGotIt() {
     if (!state.locked || !state.current) return;
-    state.queue.push(state.current);
+
+    if (state.phase.strictOrder) {
+      /* строгий порядок: возвращаем в начало очереди */
+      state.queue.unshift(state.current);
+    } else {
+      /* обычный режим: возвращаем в конец */
+      state.queue.push(state.current);
+    }
+
     nextExample();
   }
 
