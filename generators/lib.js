@@ -227,16 +227,7 @@
 
   /* ─────────── фабрики фаз ─────────── */
 
-  /* Фаза-вопрос с одним правильным вариантом.
-     opts: {
-       title,
-       key?, hint?, progress?, label?,
-       total?,
-       generate      — функция, возвращающая объект вопроса, ИЛИ
-       questions     — массив объектов вопросов, ИЛИ
-       question      — один объект вопроса
-     }
-     Объект вопроса: { text, options, correct } */
+  /* Фаза-вопрос с одним правильным вариантом. */
   function singleChoicePhase(opts) {
     var generate = opts.generate;
 
@@ -244,7 +235,6 @@
       var list = opts.questions ||
                  (opts.question ? [opts.question] : []);
 
-      /* замораживаем ссылку и делаем пошаговый итератор */
       generate = (function (items) {
         var i = 0;
         return function () {
@@ -262,20 +252,21 @@
     }
 
     return {
-      key:          opts.key,
-      label:        opts.label || 'Вопрос',
-      title:        opts.title,
-      intro:        opts.intro,
-      total:        total,
-      strictOrder:  opts.strictOrder, 
-      wrongAction:  opts.wrongAction,
-      progress:     opts.progress || 'group',
-      hint:         opts.hint,
-      top:          [{ type: 'example-string', class: 'question' }],
-      bottom:       singleChoicePanel,
-      generate:     generate,
-      check:        checkSingleChoice,
-      formatAnswer: formatSingleChoice
+      key:           opts.key,
+      label:         opts.label || 'Вопрос',
+      title:         opts.title,
+      intro:         opts.intro,
+      total:         total,
+      strictOrder:   opts.strictOrder, 
+      wrongAction:   opts.wrongAction,
+      correctAction: opts.correctAction, /* ← ДОБАВЛЕНО */
+      progress:      opts.progress || 'group',
+      hint:          opts.hint,
+      top:           [{ type: 'example-string', class: 'question' }],
+      bottom:        singleChoicePanel,
+      generate:      generate,
+      check:         checkSingleChoice,
+      formatAnswer:  formatSingleChoice
     };
   }
 
@@ -303,19 +294,7 @@
     return p;
   }
 
-    /* Фаза-задание с SVG-иллюстрацией над полем ввода.
-     opts: {
-       title,
-       key?, label?, hint?, progress?, total?,
-       questions     — массив объектов вопроса, ИЛИ
-       question      — один объект, ИЛИ
-       generate      — функция, возвращающая объект,
-       bottom?       — описание нижней панели (по умолчанию singleChoicePanel),
-       check?        — функция проверки (по умолчанию checkSingleChoice),
-       formatAnswer? — как показать верный ответ (по умолчанию formatSingleChoice)
-     }
-     Каждый вопрос — { text, svg, ...свои поля }.
-     Формат ответа зависит от выбранных bottom/check. */
+  /* Фаза-задание с SVG-иллюстрацией над полем ввода. */
   function svgTaskPhase(opts) {
     var generate = opts.generate;
 
@@ -340,21 +319,23 @@
     }
 
     return {
-      key:          opts.key,
-      label:        opts.label || 'Вопрос',
-      title:        opts.title,
-      total:        total,
-      wrongAction:  opts.wrongAction,
-      progress:     opts.progress || 'group',
-      hint:         opts.hint,
+      key:           opts.key,
+      label:         opts.label || 'Вопрос',
+      title:         opts.title,
+      total:         total,
+      strictOrder:   opts.strictOrder,   /* ← ДОБАВЛЕНО */
+      wrongAction:   opts.wrongAction,
+      correctAction: opts.correctAction, /* ← ДОБАВЛЕНО */
+      progress:      opts.progress || 'group',
+      hint:          opts.hint,
       top: [
         { type: 'example-string', class: 'question' },
         { type: 'svg' }
       ],
-      bottom:       opts.bottom       || singleChoicePanel,
-      generate:     generate,
-      check:        opts.check        || checkSingleChoice,
-      formatAnswer: opts.formatAnswer || formatSingleChoice
+      bottom:        opts.bottom       || singleChoicePanel,
+      generate:      generate,
+      check:         opts.check        || checkSingleChoice,
+      formatAnswer:  opts.formatAnswer || formatSingleChoice
     };
   }
   /* ─────────── экспорт ─────────── */
