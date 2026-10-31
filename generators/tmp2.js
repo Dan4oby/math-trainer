@@ -35,7 +35,7 @@
       progress: 'group',
       
       /* можно раскомментировать, если нужен режим «без подсветки верного» */
-      // correctAction: 'silent',
+      // wrongAction: 'silent',
 
       top:    [{ type: 'example-string', class: 'question' }],
       bottom: [[{ type: 'text', id: 'ans', placeholder: 'ответ' }]],
