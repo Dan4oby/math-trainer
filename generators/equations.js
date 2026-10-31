@@ -33,6 +33,7 @@
       total:   questions.length,
       progress: 'group',
       wrongAction: 'silent',
+      strictOrder: true,
       top:    [{ type: 'example-string', class: 'question' }],
       bottom: [[{ type: 'text', id: 'ans', placeholder: 'корень' }]],
 
