@@ -392,14 +392,14 @@
       text:
         'Перед тем, как идти дальше давай запомним это:<br>' +
         '$x\\to 1\\cdot x$<br>' +
-        '$-x\\to(-1)\\cdot x\\tox\\cdot(-1)$<br>' +
-        '$-5x\\to(-5)\\cdot x\\tox\\cdot(-5)$<br>'
+        '$-x\\to(-1)\\cdot x\\to x\\cdot(-1)$<br>' +
+        '$-5x\\to(-5)\\cdot x\\to x\\cdot(-5)$<br>'
     },
     {
       title: 'Важно запомнить',
       text:
-        '$-5x\\to(-5)\\cdot x\\tox\\cdot(-5)$<br>' +
-        '$-\\frac{4}{3}x\\to(-4\\cdot\\frac{1}{3})\\cdotx$<br>'
+        '$-5x\\to(-5)\\cdot x\\to x\\cdot(-5)$<br>' +
+        '$-\\frac{4}{3}x\\to(-4\\cdot\\frac{1}{3})\\cdot x$<br>'
     }
     ]
   }),
